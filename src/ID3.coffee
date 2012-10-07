@@ -19,7 +19,6 @@ fromUTF8ToString = (buff) -> buff.toString()
 class ID3
   constructor: (filepath) ->
     @__readbytes   = 0
-    @frames        = []
     @unknownFrames = []
 
     @load(filepath) if filepath?
@@ -58,14 +57,21 @@ class ID3
           readFrame = @getFrameReader data,frames
           frame     = false
           while (frame = do readFrame) isnt false
-            #TODO: Instead of adding to array add to self under frame name
-            if frame instanceof Frame then @frames.push frame
+            #TODO: Does not account for the upgrade to 2.3/2.4 tags that
+            # mutagen uses
+            if frame instanceof Frame then @add frame
             else if frame?            then @unknownFrames.push frame
 
     finally
       fs.closeSync @__fileobj
       @__fileobj  = null
       @__filesize = null
+      # if translate:
+      #   self.update_to_v24()
+
+  add: (frame) ->
+    # if len(type(tag).__name__) == 3: tag = type(tag).__base__(tag)
+    this[frame] = frame
 
   loadHeader: () ->
     data = @fullRead 10
@@ -149,16 +155,19 @@ class ID3
           
           break unless (size == 0) # drop empty frames
 
-        frameSpec = frames[name]
-        #if (frameSpec === undefined) {
-        #TODO: Temporary hackaround while we're defining specs
-        if not _.isArray(frameSpec)
+        tag = frames[name]
+        ##TODO: Temporary conditional workaround while we're
+        ## defining specs
+        # if tag is undefined
+        if tag is undefined or typeof tag is 'string'
           if Frame.isValidFrameId(name) then return header + framedata
         else
-          return Frame.loadFramedata(this, frameSpec, flags, framedata)
-          ## try: yield self.__load_framedata(tag, flags, framedata)
-          ## except NotImplementedError: yield header + framedata
-          ## except ID3JunkFrameError: pass
+          try
+            return @loadFramedata(tag, flags, framedata)
+          catch err
+            console.log err
+            ## except NotImplementedError: yield header + framedata
+            ## except ID3JunkFrameError: pass
     
     else if (2 <= @version.majorRev)
       while data.length
@@ -184,6 +193,8 @@ class ID3
             ## try: yield self.__load_framedata(tag, 0, framedata)
             ## except NotImplementedError: yield header + framedata
             ## except ID3JunkFrameError: pass
+  
+  loadFramedata: (tag, flags, data) -> tag.fromData(tag,this,flags,data)
 
   determineBPI: (data, frames) ->
     #TODO: Does this logic equate?
@@ -240,9 +251,9 @@ class ID3
 module.exports = ID3
 
 class Frame
-  constructor: (frameSpecs, data) ->
+  constructor: (data) ->
     odata = data
-    for spec in frameSpecs
+    for spec in @framespec
       throw new Error('ID3JunkFrameError') unless data.length > 0
       ##try: value, data = reader.read(self, data)
       [value, data] = spec.read(this, data)
@@ -254,6 +265,10 @@ class Frame
         ##warn('Leftover data: %s: %r (from %r)' % (
           ##type(self).__name__, data, odata),
       ##ID3Warning)
+      
+  toString: () -> @constructor.name
+
+Frame.toString = () -> @name
 
 Frame.isValidFrameId = (frameId) -> 
   upperBound  = 'Z'.charCodeAt(0)
@@ -270,7 +285,7 @@ Frame.isValidFrameId = (frameId) ->
 
   return isAlphaNumeric
 
-Frame.loadFramedata = (id3, frameSpecs, tflags, data) -> 
+Frame.fromData = (cls, id3, tflags, data) -> 
 
   if 4 <= id3.version.majorRev
     true
@@ -312,8 +327,8 @@ Frame.loadFramedata = (id3, frameSpecs, tflags, data) ->
               ##if id3.PEDANTIC:
                   ##raise ID3BadCompressedData, '%s: %r' % (err, data)
 
-  frame = new Frame(frameSpecs, data)
-  frame._rawdata = data
+  frame = new cls(data)
+  ##frame._rawdata = data
   ##frame._flags = tflags
   ##frame._readData(data)
   return frame
@@ -383,12 +398,11 @@ class EncodedTextSpec extends Spec
   read: (frame, data) -> 
     [decode, term] = @_encodings[frame.encoding]
     
-    ret = ''
-    offset = -1
     hexStr = data.toString 'hex'
     grouping = if term.length is 2 then /(.{2})/g else /(.{4})/g
-
     hexArr = hexStr.match grouping
+
+    ret = ''
     offset = hexArr.indexOf term 
     if offset isnt -1
       stringOffset = offset * term.length
@@ -403,9 +417,112 @@ class EncodedTextSpec extends Spec
 
 class EncodedNumericTextSpec extends EncodedTextSpec
 
-TextFrame = [ EncodingSpec('encoding'), MultiSpec('text', EncodedTextSpec('text'), sep='\u0000') ]
+class TextFrame extends Frame
+  framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedTextSpec('text'), sep='\u0000') ]
   
-NumericTextFrame = [ EncodingSpec('encoding'), MultiSpec('text', EncodedNumericTextSpec('text'), '\u0000') ]
+class NumericTextFrame extends TextFrame
+  framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedNumericTextSpec('text'), '\u0000') ]
+
+# v2.3
+FRAMES = {
+  "AENC" : "Audio encryption",
+  "APIC" : "Attached picture",
+  "COMM" : "Comments",
+  "COMR" : "Commercial frame",
+  "ENCR" : "Encryption method registration",
+  "EQUA" : "Equalization",
+  "ETCO" : "Event timing codes",
+  "GEOB" : "General encapsulated object",
+  "GRID" : "Group identification registration",
+  "IPLS" : "Involved people list",
+  "LINK" : "Linked information",
+  "MCDI" : "Music CD identifier",
+  "MLLT" : "MPEG location lookup table",
+  "OWNE" : "Ownership frame",
+  "PRIV" : "Private frame",
+  "PCNT" : "Play counter",
+  "POPM" : "Popularimeter",
+  "POSS" : "Position synchronisation frame",
+  "RBUF" : "Recommended buffer size",
+  "RVAD" : "Relative volume adjustment",
+  "RVRB" : "Reverb",
+  "SYLT" : "Synchronized lyric/text",
+  "SYTC" : "Synchronized tempo codes",
+  "TALB" : "Album/Movie/Show title",
+  "TBPM" : "BPM (beats per minute)",
+  "TCOM" : "Composer",
+  "TCON" : "Content type",
+  "TCOP" : "Copyright message",
+  "TDAT" : "Date",
+  "TDLY" : "Playlist delay",
+  "TENC" : "Encoded by",
+  "TEXT" : "Lyricist/Text writer",
+  "TFLT" : "File type",
+  "TIME" : "Time",
+  "TIT1" : "Content group description",
+  "TIT2" : "Title/songname/content description",
+  "TIT3" : "Subtitle/Description refinement",
+  "TKEY" : "Initial key",
+  "TLAN" : "Language(s)",
+  "TLEN" : "Length",
+  "TMED" : "Media type",
+  "TOAL" : "Original album/movie/show title",
+  "TOFN" : "Original filename",
+  "TOLY" : "Original lyricist(s)/text writer(s)",
+  "TOPE" : "Original artist(s)/performer(s)",
+  "TORY" : "Original release year",
+  "TOWN" : "File owner/licensee",
+  "TPE1" : "Lead performer(s)/Soloist(s)",
+  "TPE2" : "Band/orchestra/accompaniment",
+  "TPE3" : "Conductor/performer refinement",
+  "TPE4" : "Interpreted, remixed, or otherwise modified by",
+  "TPOS" : "Part of a set",
+  "TPUB" : "Publisher",
+  "TRCK" : "Track number/Position in set",
+  "TRDA" : "Recording dates",
+  "TRSN" : "Internet radio station name",
+  "TRSO" : "Internet radio station owner",
+  "TSIZ" : "Size",
+  "TSRC" : "ISRC (international standard recording code)",
+  "TSSE" : "Software/Hardware and settings used for encoding",
+  "TYER" : "Year",
+  "TXXX" : "User defined text information frame",
+  "UFID" : "Unique file identifier",
+  "USER" : "Terms of use",
+  "USLT" : "Unsychronized lyric/text transcription",
+  "WCOM" : "Commercial information",
+  "WCOP" : "Copyright/Legal information",
+  "WOAF" : "Official audio file webpage",
+  "WOAR" : "Official artist/performer webpage",
+  "WOAS" : "Official audio source webpage",
+  "WORS" : "Official internet radio station homepage",
+  "WPAY" : "Payment",
+  "WPUB" : "Publishers official webpage",
+  "WXXX" : "User defined URL link frame"
+}
+
+# Workaround since we still need a complete
+# lookup for determineBPI
+$FRAMES = [
+  class TALB extends TextFrame,        # Album/Movie/Show title
+  class TBPM extends NumericTextFrame, # BPM (beats per minute)
+  class TCOM extends TextFrame,        # Composer
+  class TCOP extends TextFrame,        # Copyright message
+  class TCMP extends NumericTextFrame, # iTunes Compilation Flag
+  class TDAT extends TextFrame,        # Date of recording (DDMM)
+  class TIME extends TextFrame,        # Time of recording (HHMM)
+  class TIT1 extends TextFrame,        # Content group description
+  class TIT2 extends TextFrame,        # Title/songname/content description
+  class TIT3 extends TextFrame,        # Conductor/performer refinement
+  class TPE1 extends TextFrame,        # Lead performer(s)/Soloist(s)
+  class TPE2 extends TextFrame,        # Band/orchestra/accompaniment
+  class TPE3 extends TextFrame,        # Conductor
+  class TPE4 extends TextFrame,        # Interpreter/remixer/modifier
+  class TYER extends NumericTextFrame  # Year
+]
+
+for cls in $FRAMES
+  FRAMES[cls] = cls
 
 FRAMES_2_2 = {
   # v2.2
@@ -472,82 +589,4 @@ FRAMES_2_2 = {
   "WCP" : "Copyright/Legal information",
   "WPB" : "Publishers official webpage",
   "WXX" : "User defined URL link frame",
-}
-
-FRAMES = {
-  # v2.3
-  "AENC" : "Audio encryption",
-  "APIC" : "Attached picture",
-  "COMM" : "Comments",
-  "COMR" : "Commercial frame",
-  "ENCR" : "Encryption method registration",
-  "EQUA" : "Equalization",
-  "ETCO" : "Event timing codes",
-  "GEOB" : "General encapsulated object",
-  "GRID" : "Group identification registration",
-  "IPLS" : "Involved people list",
-  "LINK" : "Linked information",
-  "MCDI" : "Music CD identifier",
-  "MLLT" : "MPEG location lookup table",
-  "OWNE" : "Ownership frame",
-  "PRIV" : "Private frame",
-  "PCNT" : "Play counter",
-  "POPM" : "Popularimeter",
-  "POSS" : "Position synchronisation frame",
-  "RBUF" : "Recommended buffer size",
-  "RVAD" : "Relative volume adjustment",
-  "RVRB" : "Reverb",
-  "SYLT" : "Synchronized lyric/text",
-  "SYTC" : "Synchronized tempo codes",
-  "TALB" : "Album/Movie/Show title",
-  "TBPM" : "BPM (beats per minute)",
-  "TCOM" : "Composer",
-  "TCON" : "Content type",
-  "TCOP" : "Copyright message",
-  "TDAT" : "Date",
-  "TDLY" : "Playlist delay",
-  "TENC" : "Encoded by",
-  "TEXT" : "Lyricist/Text writer",
-  "TFLT" : "File type",
-  "TIME" : "Time",
-  "TIT1" : "Content group description",
-  "TIT2" : TextFrame, # "Title/songname/content description",
-  "TIT3" : "Subtitle/Description refinement",
-  "TKEY" : "Initial key",
-  "TLAN" : "Language(s)",
-  "TLEN" : "Length",
-  "TMED" : "Media type",
-  "TOAL" : "Original album/movie/show title",
-  "TOFN" : "Original filename",
-  "TOLY" : "Original lyricist(s)/text writer(s)",
-  "TOPE" : "Original artist(s)/performer(s)",
-  "TORY" : "Original release year",
-  "TOWN" : "File owner/licensee",
-  "TPE1" : "Lead performer(s)/Soloist(s)",
-  "TPE2" : "Band/orchestra/accompaniment",
-  "TPE3" : "Conductor/performer refinement",
-  "TPE4" : "Interpreted, remixed, or otherwise modified by",
-  "TPOS" : "Part of a set",
-  "TPUB" : "Publisher",
-  "TRCK" : "Track number/Position in set",
-  "TRDA" : "Recording dates",
-  "TRSN" : "Internet radio station name",
-  "TRSO" : "Internet radio station owner",
-  "TSIZ" : "Size",
-  "TSRC" : "ISRC (international standard recording code)",
-  "TSSE" : "Software/Hardware and settings used for encoding",
-  "TYER" : NumericTextFrame, # "Year"
-  "TXXX" : "User defined text information frame",
-  "UFID" : "Unique file identifier",
-  "USER" : "Terms of use",
-  "USLT" : "Unsychronized lyric/text transcription",
-  "WCOM" : "Commercial information",
-  "WCOP" : "Copyright/Legal information",
-  "WOAF" : "Official audio file webpage",
-  "WOAR" : "Official artist/performer webpage",
-  "WOAS" : "Official audio source webpage",
-  "WORS" : "Official internet radio station homepage",
-  "WPAY" : "Payment",
-  "WPUB" : "Publishers official webpage",
-  "WXXX" : "User defined URL link frame"
 }
