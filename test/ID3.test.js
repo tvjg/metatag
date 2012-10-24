@@ -19,12 +19,17 @@ vows.describe('ID3').addBatch({
 
 	  var testHeader = headerLoads[fd];
 	  var b = new Buffer(testHeader,'hex');
-	  try {
-	    b.copy(buff, offset, position, position+size);
-	  } catch(e) {
-	    throw new Error('End of file');
-	  }
-	  return size;  
+         
+          // Buffer.copy will throw if we overstep bounds
+          // fs.readSync copies to end and return read size
+          var endPos = position+size;
+          if (endPos > b.length) {
+            endPos = b.length;
+            size = endPos - position;
+          }
+	  
+          b.copy(buff, offset, position, endPos);
+          return size;  
 	}
       });
 
