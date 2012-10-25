@@ -4,6 +4,11 @@ Iconv = require('iconv').Iconv
 
 BitPaddedInt = require('./BitPaddedInt.js')
 
+BaseError = require('./errors.js').BaseError
+EOFError = require('./errors.js').EOFError
+class ID3NoHeaderError extends BaseError
+class ID3UnsupportedVersionError extends BaseError
+
 latin1ToUTF8 = new Iconv('ISO-8859-1','UTF-8')
 utf16 = new Iconv('UTF-16','UTF-8')
 utf16be = new Iconv('UTF-16BE','UTF-8')
@@ -25,12 +30,12 @@ class ID3
 
   fullRead: (size) ->
     throw new Error "Requested bytes #{size} less than zero" if (size < 0)
-    throw new Error "Requested #{size} of #{@__filesize} #{@filepath}" if (size > @__filesize)
+    throw new EOFError "Requested #{size} of #{@__filesize} #{@filepath}" if (size > @__filesize)
 
     buff = new Buffer size
     bytesRead = fs.readSync @__fileobj, buff, 0, size, @__readbytes
 
-    throw new Error 'End of file' if bytesRead isnt size
+    throw new EOFError 'End of file' if bytesRead isnt size
 
     @__readbytes += bytesRead
     return buff
@@ -45,9 +50,13 @@ class ID3
       try
         do @loadHeader
         headerLoaded = true
-      catch err
+      catch e
         #TODO: Handle failure to load tag header
-        console.log err
+        if e instanceof EOFError
+          @size = 0
+          throw new ID3NoHeaderError "#{@filepath}: too small (#{@__filesize} bytes)"
+        
+        console.log e
       finally
         if headerLoaded
           if @version.majorRev >= 3      then frames = FRAMES
@@ -93,8 +102,8 @@ class ID3
     sizeRepr = fromLatin1ToString data[offset...offset+=4]
     @size = BitPaddedInt(sizeRepr) + 10;
 
-    throw new Error("#{@filepath} doesn't start with an ID3 tag") unless id3 is 'ID3'
-    throw new Error("#{@filepath} ID3v2.#{@version.majorRev} not supported") unless @version.majorRev in [2,3,4]
+    throw new ID3NoHeaderError "#{@filepath} doesn't start with an ID3 tag" unless id3 is 'ID3'
+    throw new ID3UnsupportedVersionError "#{@filepath} ID3v2.#{@version.majorRev} not supported" unless @version.majorRev in [2,3,4]
 
     if @f_extended
       data = @fullRead 4
