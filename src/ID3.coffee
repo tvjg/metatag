@@ -179,27 +179,40 @@ class ID3
             ## except ID3JunkFrameError: pass
     
     else if (2 <= @version.majorRev)
-      while data.length
-        try
-          header = data[0...6]
-          offset = 0 
+      reader = () =>
+        loop
+          try
+            header = data[0...6]
+            offset = 0 
+            
+            name   = fromLatin1ToString header[offset...offset+=3]
+            size   = header[offset...offset+=3]
+          catch err
+            console.log err
+            # not enough header
+            return false
+
+          ## size, = struct.unpack('>L', '\x00'+size)
+          size = Buffer.concat([new Buffer('00','hex'), size])
+          size = size.readUInt32BE(0)
+          if ((name.replace(/[\x00]+$/g, '')) == '') then return false
           
-          name   = fromLatin1ToString header[offset...offset+=3]
-          size   = fromLatin1ToString header[offset...offset+=3]
-        catch err
-          console.log err
-          # not enough header
-          return false
-        ## size, = struct.unpack('>L', '\x00'+size)
-        if ((name.replace(/[\x00]+$/g, '')) == '') then return false
-        ## framedata = data[6:6+size]
-        ## data = data[6+size:]
-        ## if size == 0: continue # drop empty frames
-        ## try: tag = frames[name]
-        ## except KeyError:
-            ## if is_valid_frame_id(name): yield header + framedata
-        ## else:
-            ## try: yield self.__load_framedata(tag, 0, framedata)
+          framedata = data[6...6+size]
+          data      = data[6+size..]
+
+          break unless (size == 0) # drop empty frames
+        
+        tag = frames[name]
+        ##TODO: Temporary conditional workaround while we're
+        ## defining specs
+        # if tag is undefined
+        if tag is undefined or typeof tag is 'string'
+          if Frame.isValidFrameId(name) then return header + framedata
+        else
+          try
+            return @loadFramedata(tag, 0, framedata)
+          catch err
+            console.log err
             ## except NotImplementedError: yield header + framedata
             ## except ID3JunkFrameError: pass
   
@@ -457,20 +470,11 @@ FRAMES = {
   "RVRB" : "Reverb",
   "SYLT" : "Synchronized lyric/text",
   "SYTC" : "Synchronized tempo codes",
-  "TALB" : "Album/Movie/Show title",
-  "TBPM" : "BPM (beats per minute)",
-  "TCOM" : "Composer",
   "TCON" : "Content type",
-  "TCOP" : "Copyright message",
-  "TDAT" : "Date",
   "TDLY" : "Playlist delay",
   "TENC" : "Encoded by",
   "TEXT" : "Lyricist/Text writer",
   "TFLT" : "File type",
-  "TIME" : "Time",
-  "TIT1" : "Content group description",
-  "TIT2" : "Title/songname/content description",
-  "TIT3" : "Subtitle/Description refinement",
   "TKEY" : "Initial key",
   "TLAN" : "Language(s)",
   "TLEN" : "Length",
@@ -481,10 +485,6 @@ FRAMES = {
   "TOPE" : "Original artist(s)/performer(s)",
   "TORY" : "Original release year",
   "TOWN" : "File owner/licensee",
-  "TPE1" : "Lead performer(s)/Soloist(s)",
-  "TPE2" : "Band/orchestra/accompaniment",
-  "TPE3" : "Conductor/performer refinement",
-  "TPE4" : "Interpreted, remixed, or otherwise modified by",
   "TPOS" : "Part of a set",
   "TPUB" : "Publisher",
   "TRCK" : "Track number/Position in set",
@@ -494,7 +494,6 @@ FRAMES = {
   "TSIZ" : "Size",
   "TSRC" : "ISRC (international standard recording code)",
   "TSSE" : "Software/Hardware and settings used for encoding",
-  "TYER" : "Year",
   "TXXX" : "User defined text information frame",
   "UFID" : "Unique file identifier",
   "USER" : "Terms of use",
@@ -553,16 +552,10 @@ FRAMES_2_2 = {
   "RVA" : "Relative volume adjustment",
   "SLT" : "Synchronized lyric/text",
   "STC" : "Synced tempo codes",
-  "TAL" : "Album/Movie/Show title",
-  "TBP" : "BPM (Beats Per Minute)",
-  "TCM" : "Composer",
   "TCO" : "Content type",
-  "TCR" : "Copyright message",
-  "TDA" : "Date",
   "TDY" : "Playlist delay",
   "TEN" : "Encoded by",
   "TFT" : "File type",
-  "TIM" : "Time",
   "TKE" : "Initial key",
   "TLA" : "Language(s)",
   "TLE" : "Length",
@@ -572,10 +565,6 @@ FRAMES_2_2 = {
   "TOL" : "Original Lyricist(s)/text writer(s)",
   "TOR" : "Original release year",
   "TOT" : "Original album/Movie/Show title",
-  "TP1" : "Lead artist(s)/Lead performer(s)/Soloist(s)/Performing group",
-  "TP2" : "Band/Orchestra/Accompaniment",
-  "TP3" : "Conductor/Performer refinement",
-  "TP4" : "Interpreted, remixed, or otherwise modified by",
   "TPA" : "Part of a set",
   "TPB" : "Publisher",
   "TRC" : "ISRC (International Standard Recording Code)",
@@ -583,12 +572,8 @@ FRAMES_2_2 = {
   "TRK" : "Track number/Position in set",
   "TSI" : "Size",
   "TSS" : "Software/hardware and settings used for encoding",
-  "TT1" : "Content group description",
-  "TT2" : "Title/Songname/Content description",
-  "TT3" : "Subtitle/Description refinement",
   "TXT" : "Lyricist/text writer",
   "TXX" : "User defined text information frame",
-  "TYE" : "Year",
   "UFI" : "Unique file identifier",
   "ULT" : "Unsychronized lyric/text transcription",
   "WAF" : "Official audio file webpage",
@@ -599,3 +584,23 @@ FRAMES_2_2 = {
   "WPB" : "Publishers official webpage",
   "WXX" : "User defined URL link frame",
 }
+
+$FRAMES_2_2 = [
+  class TAL extends TALB,    # Album/Movie/Show title
+  class TBP extends TBPM,    # BPM (beats per minute)
+  class TCM extends TCOM,    # Composer
+  class TCR extends TCOP,    # Copyright message
+  class TCO extends TCMP,    # iTunes Compilation Flag
+  class TDA extends TDAT,    # Date of recording (DDMM)
+  class TIM extends TIME,    # Time of recording (HHMM)
+  class TT1 extends TIT1,    # Content group description
+  class TT2 extends TIT2,    # Title/songname/content description
+  class TT3 extends TIT3,    # Conductor/performer refinement
+  class TP1 extends TPE1,    # Lead performer(s)/Soloist(s)
+  class TP2 extends TPE2,    # Band/orchestra/accompaniment
+  class TP3 extends TPE3,    # Conductor
+  class TP4 extends TPE4,    # Interpreter/remixer/modifier
+  class TYE extends TYER     # Year
+]
+for cls in $FRAMES_2_2
+  FRAMES_2_2[cls] = cls
