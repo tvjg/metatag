@@ -438,12 +438,21 @@ class EncodedTextSpec extends Spec
     return [decode(data), ret]
 
 class EncodedNumericTextSpec extends EncodedTextSpec
+class EncodedNumericPartTextSpec extends EncodedTextSpec
 
 class TextFrame extends Frame
   framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedTextSpec('text'), sep='\u0000') ]
   
 class NumericTextFrame extends TextFrame
   framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedNumericTextSpec('text'), '\u0000') ]
+  
+  valueOf: () -> parseInt(@text[0], 10)
+
+class NumericPartTextFrame extends TextFrame
+  framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedNumericPartTextSpec('text'), '\u0000') ]
+
+  valueOf: () -> parseInt(@text[0].split('/')[0], 10)
+
 
 # v2.3
 FRAMES = {
@@ -477,7 +486,6 @@ FRAMES = {
   "TFLT" : "File type",
   "TKEY" : "Initial key",
   "TLAN" : "Language(s)",
-  "TLEN" : "Length",
   "TMED" : "Media type",
   "TOAL" : "Original album/movie/show title",
   "TOFN" : "Original filename",
@@ -485,9 +493,7 @@ FRAMES = {
   "TOPE" : "Original artist(s)/performer(s)",
   "TORY" : "Original release year",
   "TOWN" : "File owner/licensee",
-  "TPOS" : "Part of a set",
   "TPUB" : "Publisher",
-  "TRCK" : "Track number/Position in set",
   "TRDA" : "Recording dates",
   "TRSN" : "Internet radio station name",
   "TRSO" : "Internet radio station owner",
@@ -510,23 +516,27 @@ FRAMES = {
 }
 
 # Workaround since we still need a complete
-# lookup for determineBPI
+# lookup for determineBPI. Will eventually
+# replace FRAMES entirely.
 $FRAMES = [
-  class TALB extends TextFrame,        # Album/Movie/Show title
-  class TBPM extends NumericTextFrame, # BPM (beats per minute)
-  class TCOM extends TextFrame,        # Composer
-  class TCOP extends TextFrame,        # Copyright message
-  class TCMP extends NumericTextFrame, # iTunes Compilation Flag
-  class TDAT extends TextFrame,        # Date of recording (DDMM)
-  class TIME extends TextFrame,        # Time of recording (HHMM)
-  class TIT1 extends TextFrame,        # Content group description
-  class TIT2 extends TextFrame,        # Title/songname/content description
-  class TIT3 extends TextFrame,        # Conductor/performer refinement
-  class TPE1 extends TextFrame,        # Lead performer(s)/Soloist(s)
-  class TPE2 extends TextFrame,        # Band/orchestra/accompaniment
-  class TPE3 extends TextFrame,        # Conductor
-  class TPE4 extends TextFrame,        # Interpreter/remixer/modifier
-  class TYER extends NumericTextFrame  # Year
+  class TALB extends TextFrame,            # Album/Movie/Show title
+  class TBPM extends NumericTextFrame,     # BPM (beats per minute)
+  class TCOM extends TextFrame,            # Composer
+  class TCOP extends TextFrame,            # Copyright message
+  class TCMP extends NumericTextFrame,     # iTunes Compilation Flag
+  class TDAT extends TextFrame,            # Date of recording (DDMM)
+  class TIME extends TextFrame,            # Time of recording (HHMM)
+  class TLEN extends NumericTextFrame,     # Length
+  class TIT1 extends TextFrame,            # Content group description
+  class TIT2 extends TextFrame,            # Title/songname/content description
+  class TIT3 extends TextFrame,            # Conductor/performer refinement
+  class TPE1 extends TextFrame,            # Lead performer(s)/Soloist(s)
+  class TPE2 extends TextFrame,            # Band/orchestra/accompaniment
+  class TPE3 extends TextFrame,            # Conductor
+  class TPE4 extends TextFrame,            # Interpreter/remixer/modifier
+  class TPOS extends NumericPartTextFrame, # Part of a set
+  class TRCK extends NumericPartTextFrame, # Track number/Position in set
+  class TYER extends NumericTextFrame      # Year
 ]
 
 for cls in $FRAMES
@@ -558,18 +568,15 @@ FRAMES_2_2 = {
   "TFT" : "File type",
   "TKE" : "Initial key",
   "TLA" : "Language(s)",
-  "TLE" : "Length",
   "TMT" : "Media type",
   "TOA" : "Original artist(s)/performer(s)",
   "TOF" : "Original filename",
   "TOL" : "Original Lyricist(s)/text writer(s)",
   "TOR" : "Original release year",
   "TOT" : "Original album/Movie/Show title",
-  "TPA" : "Part of a set",
   "TPB" : "Publisher",
   "TRC" : "ISRC (International Standard Recording Code)",
   "TRD" : "Recording dates",
-  "TRK" : "Track number/Position in set",
   "TSI" : "Size",
   "TSS" : "Software/hardware and settings used for encoding",
   "TXT" : "Lyricist/text writer",
@@ -593,6 +600,7 @@ $FRAMES_2_2 = [
   class TCO extends TCMP,    # iTunes Compilation Flag
   class TDA extends TDAT,    # Date of recording (DDMM)
   class TIM extends TIME,    # Time of recording (HHMM)
+  class TLE extends TLEN,    # Length
   class TT1 extends TIT1,    # Content group description
   class TT2 extends TIT2,    # Title/songname/content description
   class TT3 extends TIT3,    # Conductor/performer refinement
@@ -600,6 +608,8 @@ $FRAMES_2_2 = [
   class TP2 extends TPE2,    # Band/orchestra/accompaniment
   class TP3 extends TPE3,    # Conductor
   class TP4 extends TPE4,    # Interpreter/remixer/modifier
+  class TPA extends TPOS,    # Part of a set
+  class TRK extends TRCK,    # Track number/Position in set
   class TYE extends TYER     # Year
 ]
 for cls in $FRAMES_2_2
