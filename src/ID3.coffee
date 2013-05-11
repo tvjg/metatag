@@ -50,13 +50,26 @@ class ID3
       try
         do @loadHeader
         headerLoaded = true
-      catch e
-        #TODO: Handle failure to load tag header
-        if e instanceof EOFError
+      catch err
+        if err instanceof EOFError
           @size = 0
           throw new ID3NoHeaderError "#{@filepath}: too small (#{@__filesize} bytes)"
+        else if err instanceof ID3NoHeaderError or err instanceof ID3UnsupportedVersionError
+          @size = 0
+
+          if @__filesize >= 128
+            #TODO: Don't really like this manipulation.
+            @__readbytes = (@__filesize - 128)
+            frames = ParseID3v1(@fullRead(128))
+            if frames
+              @version.majorRev = 1
+              @version.minorRev = 1
+              @add frame for name,frame of frames
+            else 
+              throw err
+          else
+            throw err
         
-        console.log e
       finally
         if headerLoaded
           if @version.majorRev >= 3      then frames = FRAMES
@@ -80,7 +93,7 @@ class ID3
 
   add: (frame) ->
     # if len(type(tag).__name__) == 3: tag = type(tag).__base__(tag)
-    this[frame] = frame
+    this[frame.HashKey] = frame
 
   loadHeader: () ->
     data = @fullRead 10
@@ -152,7 +165,8 @@ class ID3
             size   = header.readUInt32BE(offset); offset+=4
             flags  = header.readUInt16BE(offset)
           catch err
-            console.log err
+            console.log @filepath
+            console.log err.stack, '\n'
             # not enough header
             return false 
 
@@ -174,7 +188,8 @@ class ID3
           try
             return @loadFramedata(tag, flags, framedata)
           catch err
-            console.log err
+            console.log @filepath
+            console.log err.stack, '\n'
             ## except NotImplementedError: yield header + framedata
             ## except ID3JunkFrameError: pass
     
@@ -188,7 +203,8 @@ class ID3
             name   = fromLatin1ToString header[offset...offset+=3]
             size   = header[offset...offset+=3]
           catch err
-            console.log err
+            console.log @filepath
+            console.log err.stack, '\n'
             # not enough header
             return false
 
@@ -212,7 +228,8 @@ class ID3
           try
             return @loadFramedata(tag, 0, framedata)
           catch err
-            console.log err
+            console.log @filepath
+            console.log err.stack, '\n'
             ## except NotImplementedError: yield header + framedata
             ## except ID3JunkFrameError: pass
   
@@ -273,7 +290,45 @@ class ID3
 module.exports = ID3
 
 class Frame
-  constructor: (data) ->
+  constructor: () ->
+    Object.defineProperty(this, 'FrameID', { 
+      enumerable: true, 
+      get: () -> @constructor.name
+    });
+
+    Object.defineProperty(this, 'HashKey', { 
+      enumerable: true, 
+      get: () -> @FrameID
+    });
+
+    return this unless arguments.length > 0
+
+    #TODO:
+    if false
+      blah = false
+    #FIRSTPASS: if arguments.length == 1 and arguments[0] instanceof this 
+    #if len(args)==1 and len(kwargs)==0 and isinstance(args[0], type(self))
+      #other = args[0]
+      #for checker in @framespec
+        #val = checker.validate(self, getattr(other, checker.name))
+        #setattr(self, checker.name, val)
+    else
+      #TODO: Treat first arg as opts hash in place of kwargs
+      kwargs = arguments[0];
+
+      #for checker, val in _.zip(@framespec, args)
+        #setattr(self, checker.name, checker.validate(self, val))
+        
+      #for checker in @framespec[len(args):]
+      for checker in @framespec
+        validated = checker.validate(this, kwargs[checker.name])
+        this[checker.name] = validated
+        #Object.defineProperty(this, checker.name, validated)
+
+        #validated = checker.validate(self, kwargs.get(checker.name, None))
+        #setattr(self, checker.name, validated)
+
+  _readData: (data) ->
     odata = data
     for spec in @framespec
       throw new Error('ID3JunkFrameError') unless data.length > 0
@@ -287,10 +342,6 @@ class Frame
         ##warn('Leftover data: %s: %r (from %r)' % (
           ##type(self).__name__, data, odata),
       ##ID3Warning)
-      
-  toString: () -> @constructor.name
-
-Frame.toString = () -> @name
 
 Frame.isValidFrameId = (frameId) -> 
   upperBound  = 'Z'.charCodeAt(0)
@@ -349,10 +400,10 @@ Frame.fromData = (cls, id3, tflags, data) ->
               ##if id3.PEDANTIC:
                   ##raise ID3BadCompressedData, '%s: %r' % (err, data)
 
-  frame = new cls(data)
-  ##frame._rawdata = data
+  frame = new cls()
+  frame._rawdata = data
   ##frame._flags = tflags
-  ##frame._readData(data)
+  frame._readData(data)
   return frame
 
 class Spec
@@ -368,6 +419,8 @@ class ByteSpec extends Spec
     #TODO: Take a closer look at what we're doing here
     [ data.toString('utf8', 0, 1).charCodeAt(0), data[1..] ]
     ## return ord(data[0]), data[1:]
+
+  validate: (frame, value) -> value
     
 class EncodingSpec extends ByteSpec
   constructor: (name) ->
@@ -378,6 +431,11 @@ class EncodingSpec extends ByteSpec
     [enc, data] = super arguments...
     if enc < 16 then [enc, data] else [0, String.fromCharCode(enc) + data]
     ## else: return 0, chr(enc)+data
+  
+  validate: (frame, value) -> 
+    if 0 <= value <= 3 then return value
+    if !value then return null
+    throw new Error "Invalid Encoding: #{value}"
 
 class MultiSpec extends Spec
   constructor: (name, specs..., sep) ->
@@ -404,6 +462,20 @@ class MultiSpec extends Spec
       else values.push record[0]
 
     return [values, data]  
+
+  validate: (frame, value) ->
+    if !value then return []
+    if @sep and _.isString(value)
+      value = value.split(@sep)
+    if _.isArray(value)
+      if @specs.length is 1
+        return (@specs[0].validate(frame, v) for v in value)
+      #TODO:
+      #else
+        #return [ 
+          #[s.validate(frame, v) for (v,s) in zip(val, @specs)]
+          #for val in value ]
+      throw new Error "Invalid MultiSpec data: #{value}"
 
 class EncodedTextSpec extends Spec
   constructor: (name) ->
@@ -437,11 +509,17 @@ class EncodedTextSpec extends Spec
 
     return [decode(data), ret]
 
+  validate: (frame, value) -> value
+
 class EncodedNumericTextSpec extends EncodedTextSpec
 class EncodedNumericPartTextSpec extends EncodedTextSpec
 
 class TextFrame extends Frame
   framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedTextSpec('text'), sep='\u0000') ]
+
+  toString: () -> @text.join '\u0000'
+  
+  valueOf: () -> @text
   
 class NumericTextFrame extends TextFrame
   framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedNumericTextSpec('text'), '\u0000') ]
@@ -614,3 +692,61 @@ $FRAMES_2_2 = [
 ]
 for cls in $FRAMES_2_2
   FRAMES_2_2[cls] = cls
+
+# ID3v1.1 support.
+ParseID3v1 = (buffer) ->
+  # Parse an ID3v1 tag, returning a list of ID3v2.4 frames.
+ 
+  # In theory at least, all ID3v1 frames are ISO8859-1
+  hexString = buffer.toString('hex')
+  hexString = hexString[hexString.indexOf('544147')...]
+  if hexString is -1
+    return null
+  
+  tagByteLength = Buffer.byteLength(hexString,'hex')
+  if 128 < tagByteLength or tagByteLength < 124
+    return null
+
+  buffer = new Buffer(hexString, 'hex')
+
+  ## Issue #69 - Previous versions of Mutagen, when encountering
+  ## out-of-spec TDRC and TYER frames of less than four characters,
+  ## wrote only the characters available - e.g. "1" or "" - into the
+  ## year field. To parse those, reduce the size of the year field.
+  ## Amazingly, "0s" works as a struct format string.
+  #unpack_fmt = "3s30s30s30s%ds29sBB" % (tagByteLength - 124)
+  
+  try
+    #tag, title, artist, album, year, comment, track, genre = unpack(unpack_fmt, string)
+    offset = 0
+    tag = fromLatin1ToString buffer[offset...offset+=3]
+    title = fromLatin1ToString buffer[offset...offset+=30]
+    artist = fromLatin1ToString buffer[offset...offset+=30]
+    album = fromLatin1ToString buffer[offset...offset+=30]
+    year = fromLatin1ToString buffer[offset...offset+=(tagByteLength - 124)]
+    comment = fromLatin1ToString buffer[offset...offset+=29]
+  catch err
+    return null
+  
+  if tag isnt 'TAG'
+    return null
+  
+  fix = (string) ->
+    string.split('\u0000')[0].trim()
+  
+  [ title, artist, album, year, comment ] = (fix str for str in [title, artist, album, year, comment])
+  
+  frames = {}
+  frames["TIT2"] = new TIT2({encoding:0, text:title}) if title
+  frames["TPE1"] = new TPE1({encoding:0, text:[artist]}) if artist
+  frames["TALB"] = new TALB({encoding:0, text:album}) if album
+  #frames["TDRC"] = new TDRC({encoding:0, text:year}) if year
+  #if comment: frames["COMM"] = COMM(
+    #encoding=0, lang="eng", desc="ID3v1 Comment", text=comment)
+  ## Don't read a track number if it looks like the comment was
+  ## padded with spaces instead of nulls (thanks, WinAmp).
+  #if track and (track != 32 or string[-3] == '\x00'):
+    #frames["TRCK"] = TRCK(encoding=0, text=str(track))
+  #if genre != 255: frames["TCON"] = TCON(encoding=0, text=str(genre))
+  
+  return frames
