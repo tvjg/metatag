@@ -154,7 +154,6 @@ vows
         'should have a data value of 00 00 56 78 9A BC': function(id3) {
           id3.__extdata.should.eql('000056789abc');
         }
-      },
-      teardown: function() { rewire.reset(); }
+      }
     }})
   .export(module);
