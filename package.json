@@ -8,8 +8,8 @@
     , "iconv"      : "*"
   },
   "devDependencies": {
-    "cli-easy" : "0.1.0",
-    "vows"     : "0.6.1",
+    "cli-easy" : "*",
+    "vows"     : "*",
     "should"   : "*",
     "rewire"   : "*"
   },
