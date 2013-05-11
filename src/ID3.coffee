@@ -1,5 +1,6 @@
-fs = require 'fs'
-_  = require 'underscore'
+fs      = require 'fs'
+_       = require 'underscore'
+sprintf = require("sprintf-js").sprintf
 Iconv = require('iconv').Iconv
 
 BitPaddedInt = require('./BitPaddedInt.js')
@@ -511,8 +512,67 @@ class EncodedTextSpec extends Spec
 
   validate: (frame, value) -> value
 
+#TODO: Since I used that cute constructor override trick to avoid calling new,
+# I've created a different potential problem. In the event, I don't override the
+# subclass constructor the object will be new-ed as a different type by the
+# first overriden parent constructor. Either override all constructors in the
+# inheritance chain or find some kind of functional craziness to dynamically
+# invoke the correct constructor.
+#
+# Example:
+#  console.log (EncodedNumericTextSpec('caca') instanceof EncodedNumericTextSpec)
+#  console.log (EncodedNumericTextSpec('caca') instanceof EncodedTextSpec)
+#
 class EncodedNumericTextSpec extends EncodedTextSpec
 class EncodedNumericPartTextSpec extends EncodedTextSpec
+
+class ID3TimeStamp
+  constructor: (text) ->
+
+    Object.defineProperty this, 'text',
+      enumerable: true
+      get: () ->
+        #TODO: Mutagen may have these in different scope. Perf implications?
+        formats = ['%04d', '%02d', '%02d', '%02d', '%02d', '%02d'] 
+        seps = ['-', '-', ' ', ':', ':', 'x']
+
+        parts = [ @year, @month, @day, @hour, @minute, @second ]
+        pieces = []
+        for part,idx in parts when part isnt null
+          pieces.push(sprintf(formats[idx], part) + seps[idx])
+        pieces.join('')[...-1]
+      set: (text) ->
+        #TODO: Mutagen allows overriding regex
+        splitre = /[-T:/.]|\s+/
+        units = 'year month day hour minute second'.split(' ')
+        values = (text + ':::::').split(splitre)[...6]
+         
+        for unit,v of _.object(units,values) 
+          v = parseInt(v, 10)
+          v = null if _.isNaN(v)
+          this[unit] = v
+
+    text = text.text if text instanceof ID3TimeStamp
+    @text = text
+ 
+  toString: () -> @text
+  
+  valueOf: () -> @text
+
+class TimeStampSpec extends EncodedTextSpec
+  constructor: (name) ->
+    return new TimeStampSpec(arguments...) unless this instanceof TimeStampSpec 
+    super name
+
+  read: (frame, data) ->
+    [ value, data ] = super arguments...
+    return [ @validate(frame, value), data ]
+
+  validate: (frame, value) ->
+    try
+      return new ID3TimeStamp(value)
+    catch err
+      throw new RangeError "Invalid ID3TimeStamp: #{value}"
 
 class TextFrame extends Frame
   framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedTextSpec('text'), sep='\u0000') ]
@@ -531,6 +591,11 @@ class NumericPartTextFrame extends TextFrame
 
   valueOf: () -> parseInt(@text[0].split('/')[0], 10)
 
+class TimeStampTextFrame extends TextFrame
+  framespec: [ EncodingSpec('encoding'), MultiSpec('text', TimeStampSpec('stamp'), sep=',') ]
+
+  toString: () -> 
+    (stamp.text for stamp in @text).join(',')
 
 # v2.3
 FRAMES = {
@@ -603,6 +668,7 @@ $FRAMES = [
   class TCOP extends TextFrame,            # Copyright message
   class TCMP extends NumericTextFrame,     # iTunes Compilation Flag
   class TDAT extends TextFrame,            # Date of recording (DDMM)
+  class TDRC extends TimeStampTextFrame,   # Recording Time
   class TIME extends TextFrame,            # Time of recording (HHMM)
   class TLEN extends NumericTextFrame,     # Length
   class TIT1 extends TextFrame,            # Content group description
@@ -614,7 +680,12 @@ $FRAMES = [
   class TPE4 extends TextFrame,            # Interpreter/remixer/modifier
   class TPOS extends NumericPartTextFrame, # Part of a set
   class TRCK extends NumericPartTextFrame, # Track number/Position in set
-  class TYER extends NumericTextFrame      # Year
+  class TYER extends NumericTextFrame,     # Year
+  class TDEN extends TimeStampTextFrame,   # Encoding Time
+  class TDOR extends TimeStampTextFrame,   # Original Release Time
+  class TDRC extends TimeStampTextFrame,   # Recording Time
+  class TDRL extends TimeStampTextFrame,   # Release Time
+  class TDTG extends TimeStampTextFrame    # Tagging Time
 ]
 
 for cls in $FRAMES
@@ -725,6 +796,8 @@ ParseID3v1 = (buffer) ->
     album = fromLatin1ToString buffer[offset...offset+=30]
     year = fromLatin1ToString buffer[offset...offset+=(tagByteLength - 124)]
     comment = fromLatin1ToString buffer[offset...offset+=29]
+    track = buffer.readUInt8(offset++)
+    genre = buffer.readUInt8(offset++)
   catch err
     return null
   
@@ -740,13 +813,13 @@ ParseID3v1 = (buffer) ->
   frames["TIT2"] = new TIT2({encoding:0, text:title}) if title
   frames["TPE1"] = new TPE1({encoding:0, text:[artist]}) if artist
   frames["TALB"] = new TALB({encoding:0, text:album}) if album
-  #frames["TDRC"] = new TDRC({encoding:0, text:year}) if year
+  frames["TDRC"] = new TDRC({encoding:0, text:year}) if year
   #if comment: frames["COMM"] = COMM(
     #encoding=0, lang="eng", desc="ID3v1 Comment", text=comment)
-  ## Don't read a track number if it looks like the comment was
-  ## padded with spaces instead of nulls (thanks, WinAmp).
-  #if track and (track != 32 or string[-3] == '\x00'):
-    #frames["TRCK"] = TRCK(encoding=0, text=str(track))
+  # Don't read a track number if it looks like the comment was
+  # padded with spaces instead of nulls (thanks, WinAmp).
+  if track and (track != 32 or hexString[-6..-5] == '00')
+    frames["TRCK"] = new TRCK({encoding:0, text:track.toString()})
   #if genre != 255: frames["TCON"] = TCON(encoding=0, text=str(genre))
   
   return frames

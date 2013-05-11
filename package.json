@@ -5,6 +5,7 @@
   "dependencies": {
     "flatiron"     : "0.2.5"
     , "underscore" : "*"
+    , "sprintf-js" : "*"
     , "iconv"      : "*"
   },
   "devDependencies": {

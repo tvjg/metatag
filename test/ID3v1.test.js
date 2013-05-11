@@ -23,6 +23,15 @@ vows
         //TODO: This tests for ['piman'] in mutagen test. Why?
         'should read a artist value of \'piman\'': function(id3) {
           should.equal(id3['TPE1'], 'piman');
+        },
+        'should read a track string value of \'2\'': function(id3) {
+          should.equal(id3['TRCK'], '2');
+        },
+        'should read a track value of 2': function(id3) {
+          should.equal(id3['TRCK'], 2);
+        },
+        'should read a year value of \'2004\'': function(id3) {
+          should.equal(id3['TDRC'], '2004');
         }
       }
     }})
