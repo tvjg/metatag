@@ -343,6 +343,8 @@ class Frame
         ##warn('Leftover data: %s: %r (from %r)' % (
           ##type(self).__name__, data, odata),
       ##ID3Warning)
+      
+Frame.toString = () -> @name
 
 Frame.isValidFrameId = (frameId) -> 
   upperBound  = 'Z'.charCodeAt(0)
