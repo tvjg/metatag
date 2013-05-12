@@ -123,7 +123,7 @@ class ID3
       data = @fullRead 4
       extSizeRepr = fromLatin1ToString data
     
-      if _.include(FRAMES, extSizeRepr) 
+      if FRAMES[extSizeRepr]
         # Some tagger sets the extended header flag but
         # doesn't write an extended header; in this case, the
         # ID3 data follows immediately. Since no extended
