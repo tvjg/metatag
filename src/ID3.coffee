@@ -298,6 +298,7 @@ class Frame
     });
 
     Object.defineProperty(this, 'HashKey', { 
+      configurable: true,
       enumerable: true, 
       get: () -> @FrameID
     });
@@ -439,6 +440,25 @@ class EncodingSpec extends ByteSpec
     if 0 <= value <= 3 then return value
     if !value then return null
     throw new Error "Invalid Encoding: #{value}"
+
+
+class StringSpec extends Spec
+  constructor: (name, length) ->
+    return new StringSpec(arguments...) unless this instanceof StringSpec
+
+    @len = length
+    super name
+
+  read: (frame, data) ->
+    #return data[:s.len], data[s.len:]
+    [ data[...@len], data[@len..] ]
+
+  validate: (frame, value) ->
+    if value is null then return null
+    #TODO: This returns a buffer where mutagen would return a string I think
+    if _.isString(value) and value.length == @len then return value
+
+    throw new RangeError sprintf('Invalid StringSpec[%d] data: %s', @len, value)
 
 class MultiSpec extends Spec
   constructor: (name, specs..., sep) ->
@@ -594,16 +614,39 @@ class NumericPartTextFrame extends TextFrame
   valueOf: () -> parseInt(@text[0].split('/')[0], 10)
 
 class TimeStampTextFrame extends TextFrame
-  framespec: [ EncodingSpec('encoding'), MultiSpec('text', TimeStampSpec('stamp'), sep=',') ]
+  framespec: [ EncodingSpec('encoding'), MultiSpec('text', TimeStampSpec('stamp'), ',') ]
 
   toString: () -> 
     (stamp.text for stamp in @text).join(',')
+
+##
+## User comment.
+##
+## User comment frames have a descrption, like TXXX, and also a three letter
+## ISO language code in the 'lang' attribute.
+##
+class COMM extends TextFrame
+  framespec: [
+    EncodingSpec('encoding'),
+    StringSpec('lang', 3),
+    EncodedTextSpec('desc'),
+    MultiSpec('text', EncodedTextSpec('text'), '\u0000')
+  ]
+
+  constructor: () ->
+    super
+    Object.defineProperty(this, 'HashKey', {
+      enumerable: true,
+      #TODO: Mutagen uses format string %s:%s:%r which yields a repr for lang.
+      # My guess is this may be used for writes, so I'm unsure if neccessary
+      # here.
+      get: () -> sprintf('%s:%s:%s', @FrameID, @desc, @lang)
+    });
 
 # v2.3
 FRAMES = {
   "AENC" : "Audio encryption",
   "APIC" : "Attached picture",
-  "COMM" : "Comments",
   "COMR" : "Commercial frame",
   "ENCR" : "Encryption method registration",
   "EQUA" : "Equalization",
@@ -687,7 +730,8 @@ $FRAMES = [
   class TDOR extends TimeStampTextFrame,   # Original Release Time
   class TDRC extends TimeStampTextFrame,   # Recording Time
   class TDRL extends TimeStampTextFrame,   # Release Time
-  class TDTG extends TimeStampTextFrame    # Tagging Time
+  class TDTG extends TimeStampTextFrame,   # Tagging Time
+  COMM                                     # Comments
 ]
 
 for cls in $FRAMES
@@ -697,7 +741,6 @@ FRAMES_2_2 = {
   # v2.2
   "BUF" : "Recommended buffer size",
   "CNT" : "Play counter",
-  "COM" : "Comments",
   "CRA" : "Audio encryption",
   "CRM" : "Encrypted meta frame",
   "ETC" : "Event timing codes",
@@ -761,7 +804,8 @@ $FRAMES_2_2 = [
   class TP4 extends TPE4,    # Interpreter/remixer/modifier
   class TPA extends TPOS,    # Part of a set
   class TRK extends TRCK,    # Track number/Position in set
-  class TYE extends TYER     # Year
+  class TYE extends TYER,    # Year
+  class COM extends COMM     # Comments
 ]
 for cls in $FRAMES_2_2
   FRAMES_2_2[cls] = cls
@@ -816,12 +860,20 @@ ParseID3v1 = (buffer) ->
   frames["TPE1"] = new TPE1({encoding:0, text:[artist]}) if artist
   frames["TALB"] = new TALB({encoding:0, text:album}) if album
   frames["TDRC"] = new TDRC({encoding:0, text:year}) if year
-  #if comment: frames["COMM"] = COMM(
-    #encoding=0, lang="eng", desc="ID3v1 Comment", text=comment)
+
+  if comment
+    frames["COMM"] = new COMM({
+      encoding:0,
+      lang:"eng",
+      desc:"ID3v1 Comment",
+      text:comment
+    })
+
   # Don't read a track number if it looks like the comment was
   # padded with spaces instead of nulls (thanks, WinAmp).
   if track and (track != 32 or hexString[-6..-5] == '00')
     frames["TRCK"] = new TRCK({encoding:0, text:track.toString()})
+
   #if genre != 255: frames["TCON"] = TCON(encoding=0, text=str(genre))
   
   return frames
