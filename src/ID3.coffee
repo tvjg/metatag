@@ -1,7 +1,7 @@
 fs      = require 'fs'
 _       = require 'underscore'
 sprintf = require("sprintf-js").sprintf
-Iconv = require('iconv').Iconv
+convert = require './text-encodings'
 
 BitPaddedInt = require('./BitPaddedInt.js')
 
@@ -9,18 +9,6 @@ BaseError = require('./errors.js').BaseError
 EOFError = require('./errors.js').EOFError
 class ID3NoHeaderError extends BaseError
 class ID3UnsupportedVersionError extends BaseError
-
-latin1ToUTF8 = new Iconv('ISO-8859-1','UTF-8')
-utf16 = new Iconv('UTF-16','UTF-8')
-utf16be = new Iconv('UTF-16BE','UTF-8')
-
-convertToString = (iconv) ->
-  (buffer) -> (iconv.convert buffer).toString()
-
-fromLatin1ToString = convertToString latin1ToUTF8 
-fromUTF16ToString = convertToString utf16 
-fromUTF16BEToString = convertToString utf16be 
-fromUTF8ToString = (buff) -> buff.toString()
 
 class ID3
   constructor: (filepath) ->
@@ -118,7 +106,7 @@ class ID3
     data = @fullRead 10
     
     offset = 0
-    id3 = fromLatin1ToString data[offset...offset+=3]
+    id3 = (convert data[offset...offset+=3]).from 'latin1'
 
     @version = {
       majorRev : data.readUInt8(offset++)
@@ -127,7 +115,7 @@ class ID3
   
     @__flags = data.readUInt8(offset++)
    
-    sizeRepr = fromLatin1ToString data[offset...offset+=4]
+    sizeRepr = (convert data[offset...offset+=4]).from 'latin1'
     @size = BitPaddedInt(sizeRepr) + 10;
 
     throw new ID3NoHeaderError "#{@filepath} doesn't start with an ID3 tag" unless id3 is 'ID3'
@@ -135,7 +123,7 @@ class ID3
 
     if @f_extended
       data = @fullRead 4
-      extSizeRepr = fromLatin1ToString data
+      extSizeRepr = (convert data).from 'latin1'
     
       if FRAMES[extSizeRepr]
         # Some tagger sets the extended header flag but
@@ -176,7 +164,7 @@ class ID3
             header = data[0...10]
             offset = 0
             
-            name   = fromLatin1ToString header[offset...offset+=4]
+            name   = (convert header[offset...offset+=4]).from 'latin1'
             size   = header.readUInt32BE(offset); offset+=4
             flags  = header.readUInt16BE(offset)
           catch err
@@ -215,7 +203,7 @@ class ID3
             header = data[0...6]
             offset = 0 
             
-            name   = fromLatin1ToString header[offset...offset+=3]
+            name   = (convert header[offset...offset+=3]).from 'latin1'
             size   = header[offset...offset+=3]
           catch err
             console.log @filepath
@@ -269,7 +257,7 @@ class ID3
       if part is EMPTY
         bpioff = -((data.length - o) % 10)
         break
-      name   = fromLatin1ToString part[0...4]
+      name   = (convert part[0...4]).from('latin1')
       size   = part.readUInt32BE(4)
       flags  = part.readUInt16BE(8)
       size = BitPaddedInt(size)
@@ -287,7 +275,7 @@ class ID3
       if part is EMPTY
         intoff = -((data.length - o) % 10)
         break
-      name   = fromLatin1ToString part[0...4]
+      name   = (convert part[0...4]).from 'latin1'
       size   = part.readUInt32BE(4)
       flags  = part.readUInt16BE(8)
       o += 10 + size
@@ -519,15 +507,15 @@ class EncodedTextSpec extends Spec
     return new EncodedTextSpec(arguments...) unless this instanceof EncodedTextSpec 
    
     @_encodings = [ 
-      [ fromLatin1ToString, '00' ],
-      [ fromUTF16ToString, '0000' ],
-      [ fromUTF16BEToString, '0000' ],
-      [ fromUTF8ToString, '00' ]
+      [ 'latin1'  , '00' ], 
+      [ 'utf16'   , '0000' ], 
+      [ 'utf16be' , '0000' ], 
+      [ 'utf8'    , '00' ]
     ]
     super name
 
   read: (frame, data) -> 
-    [decode, term] = @_encodings[frame.encoding]
+    [encoding, term] = @_encodings[frame.encoding]
     
     hexStr = data.toString 'hex'
     grouping = if term.length is 2 then /(.{2})/g else /(.{4})/g
@@ -544,7 +532,7 @@ class EncodedTextSpec extends Spec
 
     if data.length < term.length then return ['', ret] 
 
-    return [decode(data), ret]
+    return [(convert data).from(encoding), ret]
 
   validate: (frame, value) -> value
 
@@ -850,12 +838,12 @@ ParseID3v1 = (buffer) ->
   try
     #tag, title, artist, album, year, comment, track, genre = unpack(unpack_fmt, string)
     offset = 0
-    tag = fromLatin1ToString buffer[offset...offset+=3]
-    title = fromLatin1ToString buffer[offset...offset+=30]
-    artist = fromLatin1ToString buffer[offset...offset+=30]
-    album = fromLatin1ToString buffer[offset...offset+=30]
-    year = fromLatin1ToString buffer[offset...offset+=(tagByteLength - 124)]
-    comment = fromLatin1ToString buffer[offset...offset+=29]
+    tag     = (convert buffer[offset...offset+= 3]).from 'latin1'
+    title   = (convert buffer[offset...offset+= 30]).from 'latin1'
+    artist  = (convert buffer[offset...offset+= 30]).from 'latin1'
+    album   = (convert buffer[offset...offset+= 30]).from 'latin1'
+    year    = (convert buffer[offset...offset+= (tagByteLength - 124)]).from 'latin1'
+    comment = (convert buffer[offset...offset+= 29]).from 'latin1'
     track = buffer.readUInt8(offset++)
     genre = buffer.readUInt8(offset++)
   catch err
