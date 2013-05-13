@@ -26,6 +26,24 @@ class ID3
   constructor: (filepath) ->
     @__readbytes   = 0
     @unknownFrames = []
+    @__flags = 0
+
+    Object.defineProperty(this, 'f_unsynch', { 
+      enumerable: true, 
+      get: () -> ((@__flags & 0x80) != 0)
+    });
+    Object.defineProperty(this, 'f_extended', { 
+      enumerable: true, 
+      get: () -> ((@__flags & 0x40) != 0)
+    });
+    Object.defineProperty(this, 'f_experimental', { 
+      enumerable: true, 
+      get: () -> ((@__flags & 0x20) != 0)
+    });
+    Object.defineProperty(this, 'f_footer', { 
+      enumerable: true, 
+      get: () -> ((@__flags & 0x10) != 0)
+    });
 
     @load(filepath) if filepath?
 
@@ -107,11 +125,7 @@ class ID3
       minorRev : data.readUInt8(offset++)
     }
   
-    flags = data.readUInt8(offset++)
-    @f_unsynch      = ((flags & 0x80) != 0) 
-    @f_extended     = ((flags & 0x40) != 0)
-    @f_experimental = ((flags & 0x20) != 0)
-    @f_footer       = ((flags & 0x10) != 0)
+    @__flags = data.readUInt8(offset++)
    
     sizeRepr = fromLatin1ToString data[offset...offset+=4]
     @size = BitPaddedInt(sizeRepr) + 10;
@@ -132,7 +146,7 @@ class ID3
         # completely lost anyway, this seems to be the most
         # correct check.
         # http://code.google.com/p/quodlibet/issues/detail?id=126
-        @f_extended = false
+        @__flags = (@__flags ^ 0x40)
         @__extsize = 0
         @__readbytes -= 4
       else if @version.majorRev >= 4
