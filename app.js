@@ -19,6 +19,7 @@ app.cmd(/(.+)/, function() {
 
   var p = app.argv._[0];
   var tag = new Metatag(p);
+  console.log(tag);
 });
 
 app.start();
