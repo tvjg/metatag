@@ -20,7 +20,7 @@ vows
         'should throw a no header error': function(id3) {
           (function(){
             id3.load(empty);
-          }).should.throwError(/too small/); 
+          }).should.throwError(/too small/);
         }
       },
       'loading a file that doesn\'t exist': {
@@ -117,7 +117,7 @@ vows
 
             var testHeader = headerLoads[fd];
             var b = new Buffer(testHeader,'hex');
-           
+
             // Buffer.copy will throw if we overstep bounds
             // fs.readSync copies to end and return read size
             var endPos = position+size;
@@ -125,9 +125,9 @@ vows
               endPos = b.length;
               size = endPos - position;
             }
-            
+
             b.copy(buff, offset, position, endPos);
-            return size;  
+            return size;
           }
         });
 
@@ -142,10 +142,10 @@ vows
         },
         'should have a minor revision of 2': function(id3) {
           id3.loadHeader();
-          id3.version.minor.should.equal(2); 
+          id3.version.minor.should.equal(2);
         }
       },
-      
+
       'loading a v2.1 tag': {
         topic: function() {
           var id3 = new ID3();

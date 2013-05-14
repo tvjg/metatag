@@ -7,10 +7,10 @@ var ID3 = require('../lib/ID3');
 var silence = path.join('test','data','silence-44-s-v1.mp3');
 
 vows
-  .describe('ID3v1 Loading')
+  .describe('ID3v1')
   .addBatch({
     'An ID3 wrapper ': {
-      'loading a v1.1 tag ': {
+      'loading a v1.1 tagged test file ': {
         topic: function() {
           return new ID3(silence);
         },
@@ -20,9 +20,8 @@ vows
         'should read a title value of \'Silence\'': function(id3) {
           should.equal(id3['TIT2'], 'Silence');
         },
-        //TODO: This tests for ['piman'] in mutagen test. Why?
-        'should read a artist value of \'piman\'': function(id3) {
-          should.equal(id3['TPE1'], 'piman');
+        'should read an artist value of [\'piman\']': function(id3) {
+          id3.TPE1.text.should.eql(['piman']);
         },
         'should read a track string value of \'2\'': function(id3) {
           should.equal(id3['TRCK'], '2');
