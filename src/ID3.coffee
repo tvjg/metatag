@@ -2,6 +2,7 @@ fs      = require 'fs'
 _       = require 'underscore'
 sprintf = require("sprintf-js").sprintf
 convert = require './text-encodings'
+unsynch = require './unsynch'
 
 BitPaddedInt = require './BitPaddedInt'
 Frame = require './Frame'
@@ -16,6 +17,12 @@ class ID3
     @__readbytes   = 0
     @unknownFrames = []
     @__flags = 0
+
+    # ID3v2 spec actually describes calls the minor number the major version
+    # and the subminor number the revision. Mutagen uses tuples to handle this
+    # in a terminology free way, but we don't have that option, so just use
+    # neutral terms instead of ID3 spec terms.
+    @version = { major: 2, minor: 4, sub: 0 }
 
     Object.defineProperty(this, 'f_unsynch', { 
       enumerable: true, 
@@ -70,8 +77,7 @@ class ID3
             @__readbytes = (@__filesize - 128)
             frames = ParseID3v1(@fullRead(128))
             if frames
-              @version.majorRev = 1
-              @version.minorRev = 1
+              @version = { major: 1, minor: 1 }
               @add frame for name,frame of frames
             else 
               throw err
@@ -80,8 +86,8 @@ class ID3
         
       finally
         if headerLoaded
-          if @version.majorRev >= 3      then frames = Frame.FRAMES
-          else if @version.majorRev <= 2 then frames = Frame.FRAMES_2_2
+          if @version.minor >= 3      then frames = Frame.FRAMES
+          else if @version.minor <= 2 then frames = Frame.FRAMES_2_2
         
           data      = @fullRead (@size - 10)
           readFrame = @getFrameReader data,frames
@@ -110,8 +116,9 @@ class ID3
     id3 = (convert data[offset...offset+=3]).from 'latin1'
 
     @version = {
-      majorRev : data.readUInt8(offset++)
-      minorRev : data.readUInt8(offset++)
+      major : 2
+      minor : data.readUInt8(offset++)
+      sub   : data.readUInt8(offset++)
     }
   
     @__flags = data.readUInt8(offset++)
@@ -120,7 +127,7 @@ class ID3
     @size = BitPaddedInt(sizeRepr) + 10;
 
     throw new ID3NoHeaderError "#{@filepath} doesn't start with an ID3 tag" unless id3 is 'ID3'
-    throw new ID3UnsupportedVersionError "#{@filepath} ID3v2.#{@version.majorRev} not supported" unless @version.majorRev in [2,3,4]
+    throw new ID3UnsupportedVersionError "#{@filepath} ID3v2.#{@version.minor} not supported" unless @version.minor in [2,3,4]
 
     if @f_extended
       data = @fullRead 4
@@ -138,7 +145,7 @@ class ID3
         @__flags = (@__flags ^ 0x40)
         @__extsize = 0
         @__readbytes -= 4
-      else if @version.majorRev >= 4
+      else if @version.minor >= 4
         # "Where the 'Extended header size' is the size of the whole
         # extended header, stored as a 32 bit synchsafe integer."
         @__extsize = BitPaddedInt(extSizeRepr) - 4
@@ -153,11 +160,12 @@ class ID3
         @__extdata = data.toString('hex')
 
   getFrameReader: (data, frames) ->
-    # if ((this.version.majorRev < 4) && this.f_unsynch)
-      # try: data = unsynch.decode(data)
-      # except ValueError: pass
+    if ((@version.minor < 4) && @f_unsynch)
+      try
+        data = unsynch.decode(data)
+      catch err #TODO: Mutagen is only passing ValueError here
 
-    if (3 <= @version.majorRev)
+    if (3 <= @version.minor)
       bpi = @determineBPI data,frames
       reader = () => 
         loop
@@ -197,7 +205,7 @@ class ID3
             ## except NotImplementedError: yield header + framedata
             ## except ID3JunkFrameError: pass
     
-    else if (2 <= @version.majorRev)
+    else if (2 <= @version.minor)
       reader = () =>
         loop
           try
@@ -244,7 +252,7 @@ class ID3
     # EMPTY="\x00" * 10
     EMPTY="\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 
-    if (@version.majorRev < 4) 
+    if (@version.minor < 4) 
       return (i) -> parseInt(i, 10)
     
     ## have to special case whether to use bitpaddedints here

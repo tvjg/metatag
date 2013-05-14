@@ -5,9 +5,11 @@ var join = require('path').join;
 var fs = require('fs');
 
 var ID3 = rewire('../lib/ID3.js');
+var Frame = require('../lib/Frame.js');
 
 var empty = join('test','data','emptyfile.mp3');
 var silence = join('test','data','silence-44-s.mp3');
+var badsync = new Buffer('00ff00616200', 'hex');
 
 vows
   .describe('ID3 Loading')
@@ -48,8 +50,8 @@ vows
           id3.loadHeader();
           return id3;
         },
-        'should read a major revision of 3': function(id3) {
-          id3.version.majorRev.should.equal(3);
+        'should read a minor revision of 3': function(id3) {
+          id3.version.minor.should.equal(3);
         },
         'should read a size of 1314 bytes': function(id3) {
           id3.size.should.equal(1314);
@@ -70,6 +72,29 @@ vows
           (function() {
             id3.fullRead(3);
           }).should.throwError();
+        }
+      },
+      'with an unsynchronization flag': {
+        topic: new ID3(),
+        'should decode a value of \'\\xffab\'': function(id3) {
+          id3.__flags = 0x80;
+          should.equal(
+            id3.loadFramedata(Frame.FRAMES['TPE2'], 0, badsync), '\xffab');
+        }
+      },
+      'with an unsynchronization flag on a frame': {
+        topic: new ID3(),
+        'should decode a value of \'\\xfab\'': function (id3) {
+          id3.__flags = 0x00;
+          should.equal(
+            id3.loadFramedata(Frame.FRAMES['TPE2'], 0x02, badsync), '\xffab');
+        }
+      },
+      'with no unsynchronization flag': {
+        topic: new ID3(),
+        'should decode a value of \'[\'\\xff\',\'ab\']\'': function(id3) {
+          tag = id3.loadFramedata(Frame.FRAMES["TPE2"], 0, badsync);
+          tag.text.should.eql(['\xff', 'ab']);
         }
       }
 
@@ -115,9 +140,9 @@ vows
           id3.__fileobj = 'header22';
           return id3;
         },
-        'should have a major revision of 2': function(id3) {
+        'should have a minor revision of 2': function(id3) {
           id3.loadHeader();
-          id3.version.majorRev.should.equal(2); 
+          id3.version.minor.should.equal(2); 
         }
       },
       

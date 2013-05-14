@@ -1,27 +1,29 @@
 _       = require 'underscore'
 sprintf = require("sprintf-js").sprintf
 convert = require './text-encodings'
+unsynch = require './unsynch'
+
+FLAG23_ALTERTAG     = 0x8000
+FLAG23_ALTERFILE    = 0x4000
+FLAG23_READONLY     = 0x2000
+FLAG23_COMPRESS     = 0x0080
+FLAG23_ENCRYPT      = 0x0040
+FLAG23_GROUP        = 0x0020
+
+FLAG24_ALTERTAG     = 0x4000
+FLAG24_ALTERFILE    = 0x2000
+FLAG24_READONLY     = 0x1000
+FLAG24_GROUPID      = 0x0040
+FLAG24_COMPRESS     = 0x0008
+FLAG24_ENCRYPT      = 0x0004
+FLAG24_UNSYNCH      = 0x0002
+FLAG24_DATALEN      = 0x0001
 
 # Fundamental unit of ID3 data.
 
 # ID3 tags are split into frames. Each frame has a potentially
 # different structure, and so this base class is not very featureful.
 class Frame
-  FLAG23_ALTERTAG     : 0x8000
-  FLAG23_ALTERFILE    : 0x4000
-  FLAG23_READONLY     : 0x2000
-  FLAG23_COMPRESS     : 0x0080
-  FLAG23_ENCRYPT      : 0x0040
-  FLAG23_GROUP        : 0x0020
-
-  FLAG24_ALTERTAG     : 0x4000
-  FLAG24_ALTERFILE    : 0x2000
-  FLAG24_READONLY     : 0x1000
-  FLAG24_GROUPID      : 0x0040
-  FLAG24_COMPRESS     : 0x0008
-  FLAG24_ENCRYPT      : 0x0004
-  FLAG24_UNSYNCH      : 0x0002
-  FLAG24_DATALEN      : 0x0001
 
   constructor: () ->
     Object.defineProperty(this, 'FrameID', {
@@ -96,8 +98,8 @@ Frame.isValidFrameId = (frameId) ->
 
 Frame.fromData = (cls, id3, tflags, data) ->
 
-  if 4 <= id3.version.majorRev
-    if (tflags & Frame.FLAG24_UNSYNCH) or id3.f_unsynch
+  if 4 <= id3.version.minor
+    if tflags & FLAG24_UNSYNCH or id3.f_unsynch
       try
         data = unsynch.decode(data)
       catch err
@@ -129,7 +131,7 @@ Frame.fromData = (cls, id3, tflags, data) ->
                   ##if id3.PEDANTIC:
                       ##raise ID3BadCompressedData, '%s: %r' % (err, data)
 
-  else if 3 <= id3.version.majorRev
+  else if 3 <= id3.version.minor
     true
       ##if tflags & Frame.FLAG23_COMPRESS:
           ##usize, = unpack('>L', data[:4])
@@ -266,7 +268,7 @@ class EncodedTextSpec extends Spec
     data = new Buffer(data, 'hex') if typeof data is 'string'
     ret = new Buffer(ret, 'hex')
 
-    if data.length < term.length then return ['', ret]
+    if data.length < (term.length / 2) then return ['', ret]
 
     return [(convert data).from(encoding), ret]
 
