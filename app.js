@@ -1,5 +1,6 @@
 var flatiron = require('flatiron');
 var path     = require('path');
+var util     = require('util');
 
 var Metatag = require('./lib/Metatag');
 var app = module.exports = flatiron.app;
@@ -19,7 +20,7 @@ app.cmd(/(.+)/, function() {
 
   var p = app.argv._[0];
   var tag = new Metatag(p);
-  console.log(tag);
+  console.log(util.inspect(tag, { showHidden:true, depth: 3 }));
 });
 
 app.start();

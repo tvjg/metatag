@@ -14,50 +14,83 @@ class ID3UnsupportedVersionError extends BaseError
 
 class ID3
   constructor: (filepath) ->
-    @__readbytes   = 0
-    @unknownFrames = []
-    @__flags = 0
+    # The following properties are defined to be non-enumerable and
+    # non-configurable in keeping with mutagen convention which uses Python
+    # name mangling to hide most of these properties. It instead favors
+    # exposing the ID3 frames as iterable key-value pairs via its DictProxy
+    # base class.
 
-    # ID3v2 spec actually describes calls the minor number the major version
-    # and the subminor number the revision. Mutagen uses tuples to handle this
+    Object.defineProperty(this, 'filepath', { 
+      writable: true
+      value: filepath || null,
+    });
+    
+    # the total size of the ID3 tag, including the header
+    Object.defineProperty(this, 'size', { 
+      writable: true
+      value: 0,
+    });
+   
+    # raw frame data of any unknown frames found
+    Object.defineProperty(this, 'unknownFrames', { 
+      writable: false
+      value: []
+    });
+    
+    # ID3v2 spec actually refers to the minor number as the major version and
+    # the subminor number as the revision. Mutagen uses tuples to handle this
     # in a terminology free way, but we don't have that option, so just use
     # neutral terms instead of ID3 spec terms.
-    @version = { major: 2, minor: 4, sub: 0 }
+    Object.defineProperty(this, 'version', { 
+      writable: true
+      value: { major: 2, minor: 4, sub: 0 },
+    });
+
+    # Don't care for exposing these _properties, but yet to find a way to
+    # encapsulate them without resorting to obtuse tricks to emulate private
+    # properties.
+
+    Object.defineProperty(this, '_fd', { writable: true, value: null });
+    Object.defineProperty(this, '_fileSize', { writable: true, value: null });
+    
+    # Read cursor is needed since fs doesn't expose seek method.
+    Object.defineProperty(this, '_readBytes', { writable: true, value: 0 });
+   
+    Object.defineProperty(this, '_extSize', { writable: true, value: null });
+    Object.defineProperty(this, '_extData', { writable: true, value: null });
+
+    Object.defineProperty(this, '_flags', { writable: true, value: 0 });
 
     Object.defineProperty(this, 'f_unsynch', { 
-      enumerable: true, 
-      get: () -> ((@__flags & 0x80) != 0)
+      get: () -> ((@_flags & 0x80) != 0)
     });
     Object.defineProperty(this, 'f_extended', { 
-      enumerable: true, 
-      get: () -> ((@__flags & 0x40) != 0)
+      get: () -> ((@_flags & 0x40) != 0)
     });
     Object.defineProperty(this, 'f_experimental', { 
-      enumerable: true, 
-      get: () -> ((@__flags & 0x20) != 0)
+      get: () -> ((@_flags & 0x20) != 0)
     });
     Object.defineProperty(this, 'f_footer', { 
-      enumerable: true, 
-      get: () -> ((@__flags & 0x10) != 0)
+      get: () -> ((@_flags & 0x10) != 0)
     });
 
     @load(filepath) if filepath?
 
   fullRead: (size) ->
     throw new Error "Requested bytes #{size} less than zero" if (size < 0)
-    throw new EOFError "Requested #{size} of #{@__filesize} #{@filepath}" if (size > @__filesize)
+    throw new EOFError "Requested #{size} of #{@_fileSize} #{@filepath}" if (@_fileSize? && size > @_fileSize)
 
     buff = new Buffer size
-    bytesRead = fs.readSync @__fileobj, buff, 0, size, @__readbytes
+    bytesRead = fs.readSync @_fd, buff, 0, size, @_readBytes
 
     throw new EOFError 'End of file' if bytesRead isnt size
 
-    @__readbytes += bytesRead
+    @_readBytes += bytesRead
     return buff
 
   load: (@filepath) ->
-    @__fileobj  = fs.openSync filepath, 'r'
-    @__filesize = fs.statSync(filepath).size
+    @_fd  = fs.openSync filepath, 'r'
+    @_fileSize = fs.statSync(filepath).size
 
     try
       headerLoaded = false
@@ -68,21 +101,21 @@ class ID3
       catch err
         if err instanceof EOFError
           @size = 0
-          throw new ID3NoHeaderError "#{@filepath}: too small (#{@__filesize} bytes)"
+          throw new ID3NoHeaderError "#{@filepath}: too small (#{@_fileSize} bytes)"
         else if err instanceof ID3NoHeaderError or err instanceof ID3UnsupportedVersionError
           @size = 0
 
-          if @__filesize >= 128
-            #TODO: Don't really like this manipulation.
-            @__readbytes = (@__filesize - 128)
-            frames = ParseID3v1(@fullRead(128))
-            if frames
-              @version = { major: 1, minor: 1 }
-              @add frame for name,frame of frames
-            else 
-              throw err
-          else
-            throw err
+          throw err if @_fileSize < 128
+          
+          # Attempt to parse as ID3v1
+          # Skip 128 bytes from EOF
+          @_readBytes = (@_fileSize - 128)
+          frames = ParseID3v1(@fullRead(128))
+
+          throw err unless frames?
+
+          @version = { major: 1, minor: 1 }
+          @add frame for name,frame of frames
         
       finally
         if headerLoaded
@@ -99,9 +132,9 @@ class ID3
             else if frame?            then @unknownFrames.push frame
 
     finally
-      fs.closeSync @__fileobj
-      @__fileobj  = null
-      @__filesize = null
+      fs.closeSync @_fd
+      @_fd  = null
+      @_fileSize = null
       # if translate:
       #   self.update_to_v24()
 
@@ -121,7 +154,7 @@ class ID3
       sub   : data.readUInt8(offset++)
     }
   
-    @__flags = data.readUInt8(offset++)
+    @_flags = data.readUInt8(offset++)
    
     sizeRepr = (convert data[offset...offset+=4]).from 'latin1'
     @size = BitPaddedInt(sizeRepr) + 10;
@@ -142,22 +175,22 @@ class ID3
         # completely lost anyway, this seems to be the most
         # correct check.
         # http://code.google.com/p/quodlibet/issues/detail?id=126
-        @__flags = (@__flags ^ 0x40)
-        @__extsize = 0
-        @__readbytes -= 4
+        @_flags = (@_flags ^ 0x40)
+        @_extSize = 0
+        @_readBytes -= 4
       else if @version.minor >= 4
         # "Where the 'Extended header size' is the size of the whole
         # extended header, stored as a 32 bit synchsafe integer."
-        @__extsize = BitPaddedInt(extSizeRepr) - 4
+        @_extSize = BitPaddedInt(extSizeRepr) - 4
       else
         # "Where the 'Extended header size', currently 6 or 10 bytes,
         # excludes itself."
-        @__extsize = BitPaddedInt(extSizeRepr, 8)
+        @_extSize = BitPaddedInt(extSizeRepr, 8)
 
-      @__extdata = ''
-      if @__extsize
-        data = @fullRead @__extsize
-        @__extdata = data.toString('hex')
+      @_extData = ''
+      if @_extSize
+        data = @fullRead @_extSize
+        @_extData = data.toString('hex')
 
   getFrameReader: (data, frames) ->
     if ((@version.minor < 4) && @f_unsynch)

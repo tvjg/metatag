@@ -34,7 +34,7 @@ vows
       'loading an empty header ': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = fs.openSync(empty,'r');
+          id3._fd = fs.openSync(empty,'r');
           return id3;
         },
         'should throw an end of file error': function(id3) {
@@ -46,7 +46,7 @@ vows
       'loading silent test data header ': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = fs.openSync(silence,'r');
+          id3._fd = fs.openSync(silence,'r');
           id3.loadHeader();
           return id3;
         },
@@ -60,7 +60,7 @@ vows
       'loading no ID3 information': {
         topic: function() {
           var id3 = new ID3();
-          id3.__filesize = 0;
+          id3._fileSize = 0;
           return id3;
         },
         'should throw when attempting negative read': function(id3) {
@@ -77,7 +77,7 @@ vows
       'with an unsynchronization flag': {
         topic: new ID3(),
         'should decode a value of \'\\xffab\'': function(id3) {
-          id3.__flags = 0x80;
+          id3._flags = 0x80;
           should.equal(
             id3.loadFramedata(Frame.FRAMES['TPE2'], 0, badsync), '\xffab');
         }
@@ -85,7 +85,7 @@ vows
       'with an unsynchronization flag on a frame': {
         topic: new ID3(),
         'should decode a value of \'\\xfab\'': function (id3) {
-          id3.__flags = 0x00;
+          id3._flags = 0x00;
           should.equal(
             id3.loadFramedata(Frame.FRAMES['TPE2'], 0x02, badsync), '\xffab');
         }
@@ -137,7 +137,7 @@ vows
       'loading a v2.2 tag': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = 'header22';
+          id3._fd = 'header22';
           return id3;
         },
         'should have a minor revision of 2': function(id3) {
@@ -149,7 +149,7 @@ vows
       'loading a v2.1 tag': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = 'header21';
+          id3._fd = 'header21';
           return id3;
         },
         'should throw a not supported error': function(id3) {
@@ -162,7 +162,7 @@ vows
       'loading a truncated header': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = 'shortHeader';
+          id3._fd = 'shortHeader';
           return id3;
         },
         'should throw an end of file error': function(id3) {
@@ -175,37 +175,37 @@ vows
       'loading a v2.4 extended header': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = 'header24Extended';
+          id3._fd = 'header24Extended';
           id3.loadHeader();
           return id3;
         },
         'should have a size of 1 byte': function(id3) {
-          id3.__extsize.should.eql(1);
+          id3._extSize.should.eql(1);
         },
         'should have a data value of 5A': function(id3) {
-          id3.__extdata.should.eql('5a');
+          id3._extData.should.eql('5a');
         }
       },
 
       'loading a v2.3 extended header': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = 'header23Extended';
+          id3._fd = 'header23Extended';
           id3.loadHeader();
           return id3;
         },
         'should have a size of 6 bytes': function(id3) {
-          id3.__extsize.should.eql(6);
+          id3._extSize.should.eql(6);
         },
         'should have a data value of 00 00 56 78 9A BC': function(id3) {
-          id3.__extdata.should.eql('000056789abc');
+          id3._extData.should.eql('000056789abc');
         }
       },
 
       'loading a v2.4 header': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = 'header24AllowFooter';
+          id3._fd = 'header24AllowFooter';
           return id3;
         },
         'should allow a footer': function(id3) {
@@ -214,25 +214,25 @@ vows
         }
       },
 
-      'loading a v2.4 extended header containing a tag in extdata': {
+      'loading a v2.4 extended header containing a tag in extData': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = 'header24ExtendedButNot';
+          id3._fd = 'header24ExtendedButNot';
           id3.loadHeader();
           return id3;
         },
         'should yield an extended size of 0': function(id3) {
-          id3.__extsize.should.eql(0);
+          id3._extSize.should.eql(0);
         },
         'and no extended data': function(id3) {
-          id3.__extdata.should.eql('');
+          id3._extData.should.eql('');
         }
       },
 
-      'loading a v2.4 extended header but no tag in extdata': {
+      'loading a v2.4 extended header but no tag in extData': {
         topic: function() {
           var id3 = new ID3();
-          id3.__fileobj = 'header24ExtendedButNotTag';
+          id3._fd = 'header24ExtendedButNotTag';
           return id3;
         },
         'should throw an end of file error': function(id3) {

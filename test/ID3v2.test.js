@@ -14,10 +14,7 @@ vows
       'loading a v2.3 tagged test file': {
         topic: new ID3(silence),
         'should have 8 keys': function (id3) {
-          // TODO: Breaks because of other enumerable properties which should
-          // either be private or at least non-enumerable. Complicating things
-          // is that these are used in conjunction with Python's name mangling
-          // for testing in mutagen -- a convention I've now lazily imported.
+          // TODO: Has 7, Need to implement TCON
           Object.keys(id3).length.should.eql(8);
         },
         'should have no unknown frames': function (id3) {
