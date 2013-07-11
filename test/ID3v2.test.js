@@ -14,7 +14,6 @@ vows
       'loading a v2.3 tagged test file': {
         topic: new ID3(silence),
         'should have 8 keys': function (id3) {
-          // TODO: Has 7, Need to implement TCON
           Object.keys(id3).length.should.eql(8);
         },
         'should have no unknown frames': function (id3) {
@@ -24,7 +23,6 @@ vows
           should.equal(id3['TALB'], 'Quod Libet Test Data');
         },
         'should read a content type value of \'Silence\'': function(id3) {
-          // TODO: Implement TCON
           should.equal(id3['TCON'], 'Silence');
         },
         'should read a TIT1 value of \'Silence\'': function(id3) {

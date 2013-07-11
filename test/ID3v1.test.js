@@ -17,6 +17,9 @@ vows
         'should read an album value of \'Quod Libet Test Data\'': function(id3) {
           should.equal(id3['TALB'], 'Quod Libet Test Data');
         },
+        'should read a genre value of \'Darkwave\'': function(id3) {
+          should.equal(id3['TCON'].genres[0], 'Darkwave');
+        },
         'should read a title value of \'Silence\'': function(id3) {
           should.equal(id3['TIT2'], 'Silence');
         },

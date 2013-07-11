@@ -398,6 +398,7 @@ ParseID3v1 = (buffer) ->
   if track and (track != 32 or hexString[-6..-5] == '00')
     frames["TRCK"] = new Frame.FRAMES.TRCK({encoding:0, text:track.toString()})
 
-  #if genre != 255: frames["TCON"] = TCON(encoding=0, text=str(genre))
-  
+  if genre != 255
+    frames["TCON"] = new Frame.FRAMES.TCON({encoding:0, text:genre.toString()})
+
   return frames

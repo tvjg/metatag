@@ -241,19 +241,20 @@ class MultiSpec extends Spec
       throw new Error "Invalid MultiSpec data: #{value}"
 
 class EncodedTextSpec extends Spec
+
+  @_encodings = [
+    [ 'latin1'  , '00' ],
+    [ 'utf16'   , '0000' ],
+    [ 'utf16be' , '0000' ],
+    [ 'utf8'    , '00' ]
+  ]
+
   constructor: (name) ->
     return new EncodedTextSpec(arguments...) unless this instanceof EncodedTextSpec
-
-    @_encodings = [
-      [ 'latin1'  , '00' ],
-      [ 'utf16'   , '0000' ],
-      [ 'utf16be' , '0000' ],
-      [ 'utf8'    , '00' ]
-    ]
     super name
 
   read: (frame, data) ->
-    [encoding, term] = @_encodings[frame.encoding]
+    [encoding, term] = EncodedTextSpec._encodings[frame.encoding]
 
     hexStr = data.toString 'hex'
     grouping = if term.length is 2 then /(.{2})/g else /(.{4})/g
@@ -382,6 +383,86 @@ class COMM extends TextFrame
       # here.
       get: () -> sprintf('%s:%s:%s', @FrameID, @desc, @lang)
     });
+    
+## Content type (Genre)
+
+## ID3 has several ways genres can be represented; for convenience,
+## use the 'genres' property rather than the 'text' attribute.
+class TCON extends TextFrame
+
+    GENRES = require('./constants').GENRES
+
+    strDigits = ( digit.toString() for digit in [0..9] )
+    genre_re = /((?:\(([0-9]+|RX|CR)\))*)(.+)?/
+    startsWithParens = /^\(\(/
+
+    constructor: () ->
+      super
+
+      # A list of genres parsed from the raw text data.
+      Object.defineProperty(this, 'genres', {
+        get: @__get_genres,
+        set: @__set_genres
+      });
+
+    __get_genres: ->
+      genres = []
+
+      @text.forEach (value) ->
+        notDigits = ( d for d in value when d not in strDigits )
+        if value and notDigits.length is 0
+          idx = (+value)
+          genres.push (GENRES[idx] || 'Unknown')
+        else if value is 'CR'
+          genres.push 'Cover'
+        else if value is 'RX'
+          genres.push 'Remix'
+        else if value
+          newGenres = []
+          [ wholematch, genreid, dummy, genrename ] = value.match(genre_re)
+
+          if genreid
+            gids = ( gid for gid in genreid[1...-1].split(')(') )
+            gids.forEach (gid) ->
+              idx = (+gid)
+              notDigits = ( d for d in gid when d not in strDigits )
+              if notDigits.length is 0 and idx < GENRES.length
+                #gid = unicode(GENRES[int(gid)])
+                gid = GENRES[idx]
+                newGenres.push gid
+              else if gid is "CR" then newGenres.push 'Cover'
+              else if gid is "RX" then newGenres.push 'Remix'
+              else
+                newGenres.push 'Unknown'
+
+          if genrename
+            # "Unescaping" the first parenthesis
+            if startsWithParens.test(genrename) then genrename = genrename[1..]
+            if genrename not in newGenres then newGenres.push genrename
+
+          genres = (genres.concat newGenres)
+
+      return genres
+
+    __set_genres: (genres) ->
+      genres = [genres] if _.isString(genres)
+      @text = ( genre for genre in genres )
+
+      # TODO: Fairly certain that this is unneeded (at least for now. Unlike
+      # Python, JS is only concerned with encodings when we begin dealing with
+      # Buffers or sending files over the wire.
+      #@text = ( @__decode genre for genre in genres )
+
+    __decode: (value) ->
+      #if isinstance(value, str):
+        #enc = EncodedTextSpec._encodings[self.encoding][0]
+        #return value.decode(enc)
+      #else: return value
+
+      if not _.isString(value) then return value
+
+      enc = EncodedTextSpec._encodings[@encoding][0]
+      return (convert value).from(enc)
 
 # v2.3
 FRAMES = {
@@ -407,7 +488,6 @@ FRAMES = {
   "RVRB" : "Reverb",
   "SYLT" : "Synchronized lyric/text",
   "SYTC" : "Synchronized tempo codes",
-  "TCON" : "Content type",
   "TDLY" : "Playlist delay",
   "TENC" : "Encoded by",
   "TEXT" : "Lyricist/Text writer",
@@ -471,7 +551,8 @@ $FRAMES = [
   class TDRC extends TimeStampTextFrame,   # Recording Time
   class TDRL extends TimeStampTextFrame,   # Release Time
   class TDTG extends TimeStampTextFrame,   # Tagging Time
-  COMM                                     # Comments
+  COMM,                                    # Comments
+  TCON                                     # Content type
 ]
 
 for cls in $FRAMES
@@ -496,7 +577,6 @@ FRAMES_2_2 = {
   "RVA" : "Relative volume adjustment",
   "SLT" : "Synchronized lyric/text",
   "STC" : "Synced tempo codes",
-  "TCO" : "Content type",
   "TDY" : "Playlist delay",
   "TEN" : "Encoded by",
   "TFT" : "File type",
@@ -545,7 +625,8 @@ $FRAMES_2_2 = [
   class TPA extends TPOS,    # Part of a set
   class TRK extends TRCK,    # Track number/Position in set
   class TYE extends TYER,    # Year
-  class COM extends COMM     # Comments
+  class COM extends COMM,    # Comments
+  class TCO extends TCON     # Content type
 ]
 for cls in $FRAMES_2_2
   FRAMES_2_2[cls] = cls
