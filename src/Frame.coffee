@@ -1,6 +1,7 @@
 _       = require 'underscore'
 sprintf = require("sprintf-js").sprintf
-convert = require './text-encodings'
+
+convert = require '../text-encodings'
 unsynch = require './unsynch'
 
 FLAG23_ALTERTAG     = 0x8000
@@ -25,7 +26,9 @@ FLAG24_DATALEN      = 0x0001
 # different structure, and so this base class is not very featureful.
 class Frame
 
-  constructor: () ->
+  # fields should be a plain object with named properties corresponding to the
+  # framespec
+  constructor: (fields) ->
     Object.defineProperty(this, 'FrameID', {
       enumerable: true,
       get: () -> @constructor.name
@@ -39,30 +42,9 @@ class Frame
 
     return this unless arguments.length > 0
 
-    #TODO:
-    if false
-      blah = false
-    #FIRSTPASS: if arguments.length == 1 and arguments[0] instanceof this
-    #if len(args)==1 and len(kwargs)==0 and isinstance(args[0], type(self))
-      #other = args[0]
-      #for checker in @framespec
-        #val = checker.validate(self, getattr(other, checker.name))
-        #setattr(self, checker.name, val)
-    else
-      #TODO: Treat first arg as opts hash in place of kwargs
-      kwargs = arguments[0];
-
-      #for checker, val in _.zip(@framespec, args)
-        #setattr(self, checker.name, checker.validate(self, val))
-
-      #for checker in @framespec[len(args):]
-      for checker in @framespec
-        validated = checker.validate(this, kwargs[checker.name])
-        this[checker.name] = validated
-        #Object.defineProperty(this, checker.name, validated)
-
-        #validated = checker.validate(self, kwargs.get(checker.name, None))
-        #setattr(self, checker.name, validated)
+    for checker in @framespec
+      validated = checker.validate(this, fields[checker.name])
+      this[checker.name] = validated
 
   _readData: (data) ->
     odata = data
@@ -146,7 +128,7 @@ Frame.fromData = (cls, id3, tflags, data) ->
 
   frame = new cls()
   frame._rawdata = data
-  ##frame._flags = tflags
+  frame._flags = tflags
   frame._readData(data)
   return frame
 
