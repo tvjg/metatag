@@ -3,7 +3,7 @@ var should = require('should');
 var path = require('path');
 var fs = require('fs');
 
-var ID3 = require('../lib/ID3.js');
+var ID3 = require('../lib/id3');
 
 var issue21 = path.join('test','data','issue_21.id3');
 

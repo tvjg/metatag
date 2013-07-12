@@ -3,9 +3,9 @@ var should = require('should');
 var path = require('path');
 var sprintf = require("sprintf-js").sprintf
 
-var ID3 = require('../lib/ID3');
-var TCON = require('../lib/Frame').FRAMES.TCON;
-var GENRES = require('../lib/constants').GENRES;
+var ID3 = require('../lib/id3');
+var TCON = require('../lib/id3/frame').FRAMES.TCON;
+var GENRES = require('../lib/id3/constants').GENRES;
 
 function _g(s) {
   var frame = new TCON({ text:s });

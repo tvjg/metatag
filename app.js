@@ -2,7 +2,7 @@ var flatiron = require('flatiron');
 var path     = require('path');
 var util     = require('util');
 
-var Metatag = require('./lib/Metatag');
+var Metatag = require('./lib/metatag');
 var app = module.exports = flatiron.app;
 
 app.config.file({ file: path.join(__dirname, 'config', 'config.json') });

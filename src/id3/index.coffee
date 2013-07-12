@@ -1,16 +1,14 @@
 fs      = require 'fs'
 _       = require 'underscore'
 sprintf = require("sprintf-js").sprintf
-convert = require './text-encodings'
-unsynch = require './unsynch'
 
-BitPaddedInt = require './BitPaddedInt'
-Frame = require './Frame'
+convert      = require '../text-encodings'
+unsynch      = require './unsynch'
+BitPaddedInt = require '../BitPaddedInt'
+Frame        = require './frame'
 
-BaseError = require('./errors.js').BaseError
-EOFError = require('./errors.js').EOFError
-class ID3NoHeaderError extends BaseError
-class ID3UnsupportedVersionError extends BaseError
+{EOFError} = require '../errors'
+{ID3NoHeaderError, ID3UnsupportedVersionError} = require './errors'
 
 class ID3
   constructor: (filepath) ->

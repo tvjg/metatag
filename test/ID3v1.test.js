@@ -2,7 +2,7 @@ var vows   = require('vows');
 var should = require('should');
 var path = require('path');
 
-var ID3 = require('../lib/ID3');
+var ID3 = require('../lib/id3');
 
 var silence = path.join('test','data','silence-44-s-v1.mp3');
 

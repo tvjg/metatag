@@ -4,8 +4,8 @@ var rewire = require('rewire');
 var join = require('path').join;
 var fs = require('fs');
 
-var ID3 = rewire('../lib/ID3.js');
-var Frame = require('../lib/Frame.js');
+var ID3 = rewire('../lib/id3');
+var Frame = require('../lib/id3/frame');
 
 var empty = join('test','data','emptyfile.mp3');
 var silence = join('test','data','silence-44-s.mp3');
