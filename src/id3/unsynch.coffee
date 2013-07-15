@@ -1,3 +1,5 @@
+{ValueError} = require '../errors'
+
 unsynch = 
   decode: (buffer) ->
     hexVal = buffer.toString('hex')
@@ -11,12 +13,12 @@ unsynch =
         safe = (couplet != 'ff')
       else
         if couplet >= 'e0' 
-          throw new Error 'invalid sync-safe string'
+          throw new ValueError 'invalid sync-safe string'
         else if couplet != '00' 
           output.push(couplet)
         safe = true
     
-    throw new Error 'string ended unsafe' unless safe
+    throw new ValueError 'string ended unsafe' unless safe
     
     new Buffer(output.join(''), 'hex')
 

@@ -1,8 +1,10 @@
-_       = require 'underscore'
 sprintf = require("sprintf-js").sprintf
 
 convert = require '../text-encodings'
 unsynch = require './unsynch'
+
+{ValueError, UnicodeDecodeError} = require '../errors'
+{ID3JunkFrameError, ID3BadUnsynchData} = require './errors'
 
 FLAG23_ALTERTAG     = 0x8000
 FLAG23_ALTERFILE    = 0x4000
@@ -20,11 +22,20 @@ FLAG24_ENCRYPT      = 0x0004
 FLAG24_UNSYNCH      = 0x0002
 FLAG24_DATALEN      = 0x0001
 
+# Utility functions
+isString = (a) -> Object.prototype.toString.call(a) == "[object String]"
+isArray = require('util').isArray
+
 # Fundamental unit of ID3 data.
 
 # ID3 tags are split into frames. Each frame has a potentially
 # different structure, and so this base class is not very featureful.
 class Frame
+  
+  nullChars = ///
+    ^ (?: 0{2} )+    |  # leading null characters [00] in hex
+      (?: 0{2} )+ $     # trailing null chars [00] in hex
+  ///g
 
   # fields should be a plain object with named properties corresponding to the
   # framespec
@@ -49,17 +60,18 @@ class Frame
   _readData: (data) ->
     odata = data
     for spec in @framespec
-      throw new Error('ID3JunkFrameError') unless data.length > 0
-      ##try: value, data = reader.read(self, data)
-      [value, data] = spec.read(this, data)
-      ##except UnicodeDecodeError:
-      ##raise ID3JunkFrameError
+      throw new ID3JunkFrameError unless data.length > 0
+      
+      try
+        [value, data] = spec.read(this, data)
+      catch err
+        throw err unless err instanceof UnicodeDecodeError
+        throw new ID3JunkFrameError
+
       this[spec.name] = value
 
-    ##if data.strip('\x00'):
-        ##warn('Leftover data: %s: %r (from %r)' % (
-          ##type(self).__name__, data, odata),
-      ##ID3Warning)
+    if data.toString('hex').replace(nullChars, '')
+      console.warn "Leftover data: #{@FrameID}: ", data, " (from ", odata, ")"
 
 Frame.toString = () -> @name
 
@@ -81,45 +93,45 @@ Frame.isValidFrameId = (frameId) ->
 Frame.fromData = (cls, id3, tflags, data) ->
 
   if 4 <= id3.version.minor
+    throw new ID3EncryptionUnsupportedError if tflags & FLAG24_ENCRYPT
+
+    if tflags & (FLAG24_COMPRESS | FLAG24_DATALEN)
+      ## The data length int is syncsafe in 2.4 (but not 2.3).
+      ## However, we don't actually need the data length int,
+      ## except to work around a QL 0.12 bug, and in that case
+      ## all we need are the raw bytes.
+      datalen_bytes = data[...4]
+      data = data[4..]
+    
     if tflags & FLAG24_UNSYNCH or id3.f_unsynch
       try
         data = unsynch.decode(data)
       catch err
-        ##if id3.PEDANTIC:
-          ##raise ID3BadUnsynchData, '%s: %r' % (err, data)
+        throw err unless err instanceof ValueError
+        throw new ID3BadUnsynchData "#{err.message}: #{data}" if id3.PEDANTIC
 
-      ##if tflags & (Frame.FLAG24_COMPRESS | Frame.FLAG24_DATALEN):
-          ## The data length int is syncsafe in 2.4 (but not 2.3).
-          ## However, we don't actually need the data length int,
-          ## except to work around a QL 0.12 bug, and in that case
-          ## all we need are the raw bytes.
-          ##datalen_bytes = data[:4]
-          ##data = data[4:]
-      ##if tflags & Frame.FLAG24_UNSYNCH or id3.f_unsynch:
-          ##try: data = unsynch.decode(data)
-          ##except ValueError, err:
-              ##if id3.PEDANTIC:
-                  ##raise ID3BadUnsynchData, '%s: %r' % (err, data)
-      ##if tflags & Frame.FLAG24_ENCRYPT:
-          ##raise ID3EncryptionUnsupportedError
-      ##if tflags & Frame.FLAG24_COMPRESS:
-          ##try: data = data.decode('zlib')
-          ##except zlibError, err:
-              ## the initial mutagen that went out with QL 0.12 did not
-              ## write the 4 bytes of uncompressed size. Compensate.
-              ##data = datalen_bytes + data
-              ##try: data = data.decode('zlib')
-              ##except zlibError, err:
-                  ##if id3.PEDANTIC:
-                      ##raise ID3BadCompressedData, '%s: %r' % (err, data)
+    if tflags & FLAG24_COMPRESS
+      true
+      #TODO: Need to add async support up the callchain or find synchronous zlib 
+      #zlib = require 'zlib'
+      #zlib.inflate data, (err, result) ->
+        #if not err
+          #data = result
+          #return
+
+        ## the initial mutagen that went out with QL 0.12 did not
+        ## write the 4 bytes of uncompressed size. Compensate.
+        #data = Buffer.concat(datalen_bytes, data)
+        #zlib.inflate data, (err, result) ->
+          #throw new ID3BadCompressedData "#{err.message}: #{data}" if err and id3.PEDANTIC
+          #data = result
 
   else if 3 <= id3.version.minor
+    throw new ID3EncryptionUnsupportedError if tflags & FLAG23_ENCRYPT
     true
       ##if tflags & Frame.FLAG23_COMPRESS:
           ##usize, = unpack('>L', data[:4])
           ##data = data[4:]
-      ##if tflags & Frame.FLAG23_ENCRYPT:
-          ##raise ID3EncryptionUnsupportedError
       ##if tflags & Frame.FLAG23_COMPRESS:
           ##try: data = data.decode('zlib')
           ##except zlibError, err:
@@ -161,7 +173,7 @@ class EncodingSpec extends ByteSpec
   validate: (frame, value) ->
     if 0 <= value <= 3 then return value
     if !value then return null
-    throw new Error "Invalid Encoding: #{value}"
+    throw new ValueError "Invalid Encoding: #{value}"
 
 
 class StringSpec extends Spec
@@ -176,11 +188,11 @@ class StringSpec extends Spec
     [ data[...@len], data[@len..] ]
 
   validate: (frame, value) ->
-    if value is null then return null
-    #TODO: This returns a buffer where mutagen would return a string I think
-    if _.isString(value) and value.length == @len then return value
+    return null unless value?
 
-    throw new RangeError sprintf('Invalid StringSpec[%d] data: %s', @len, value)
+    return value if isString(value) and value.length == @len
+
+    throw new ValueError sprintf('Invalid StringSpec[%d] data: %s', @len, value)
 
 class MultiSpec extends Spec
   constructor: (name, specs..., sep) ->
@@ -210,9 +222,9 @@ class MultiSpec extends Spec
 
   validate: (frame, value) ->
     if !value then return []
-    if @sep and _.isString(value)
+    if @sep and isString(value)
       value = value.split(@sep)
-    if _.isArray(value)
+    if isArray(value)
       if @specs.length is 1
         return (@specs[0].validate(frame, v) for v in value)
       #TODO:
@@ -220,7 +232,7 @@ class MultiSpec extends Spec
         #return [
           #[s.validate(frame, v) for (v,s) in zip(val, @specs)]
           #for val in value ]
-      throw new Error "Invalid MultiSpec data: #{value}"
+      throw new ValueError "Invalid MultiSpec data: #{value}"
 
 class EncodedTextSpec extends Spec
 
@@ -271,30 +283,48 @@ class EncodedTextSpec extends Spec
 class EncodedNumericTextSpec extends EncodedTextSpec
 class EncodedNumericPartTextSpec extends EncodedTextSpec
 
+## A time stamp in ID3v2 format.
+ 
+## This is a restricted form of the ISO 8601 standard; time stamps
+## take the form of:
+##     YYYY-MM-DD HH:MM:SS
+## Or some partial form (YYYY-MM-DD HH, YYYY, etc.).
+## 
+## The 'text' attribute contains the raw text data of the time stamp.
+##
 class ID3TimeStamp
+  
+  formats = ['%04d', '%02d', '%02d', '%02d', '%02d', '%02d']
+  seps = ['-', '-', ' ', ':', ':', 'x']
+
+  # parseInt allows some garbage that doesn't fly with Python's int. For
+  # example, '12.aW123' will be truncated and coerced to a number. NaN is only
+  # returned if first character cannot be converted to a number. This regex
+  # from the MDN tightens things up a bit.
+  strictInt = /^\-?([0-9]+|Infinity)$/
+        
+  #TODO: Mutagen allows overriding regex
+  splitre = /[-T:/.]|\s+/
+
   constructor: (text) ->
 
     Object.defineProperty this, 'text',
       enumerable: true
       get: () ->
-        #TODO: Mutagen may have these in different scope. Perf implications?
-        formats = ['%04d', '%02d', '%02d', '%02d', '%02d', '%02d']
-        seps = ['-', '-', ' ', ':', ':', 'x']
-
         parts = [ @year, @month, @day, @hour, @minute, @second ]
         pieces = []
         for part,idx in parts when part isnt null
           pieces.push(sprintf(formats[idx], part) + seps[idx])
         pieces.join('')[...-1]
+ 
       set: (text) ->
-        #TODO: Mutagen allows overriding regex
-        splitre = /[-T:/.]|\s+/
-        units = 'year month day hour minute second'.split(' ')
-        values = (text + ':::::').split(splitre)[...6]
+        [ year, month, day, hour, minute, second ] = 
+          (text + ':::::').split(splitre)[...6]
+        values = { year, month, day, hour, minute, second } 
 
-        for unit,v of _.object(units,values)
+        for unit,v of values
           v = parseInt(v, 10)
-          v = null if _.isNaN(v)
+          v = null if Number.isNaN(v) or not strictInt.test(v)
           this[unit] = v
 
     text = text.text if text instanceof ID3TimeStamp
@@ -317,7 +347,7 @@ class TimeStampSpec extends EncodedTextSpec
     try
       return new ID3TimeStamp(value)
     catch err
-      throw new RangeError "Invalid ID3TimeStamp: #{value}"
+      throw new ValueError "Invalid ID3TimeStamp: #{value}"
 
 class TextFrame extends Frame
   framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedTextSpec('text'), sep='\u0000') ]
@@ -427,7 +457,7 @@ class TCON extends TextFrame
       return genres
 
     __set_genres: (genres) ->
-      genres = [genres] if _.isString(genres)
+      genres = [genres] if isString(genres)
       @text = ( genre for genre in genres )
 
       # TODO: Fairly certain that this is unneeded (at least for now. Unlike
@@ -441,7 +471,7 @@ class TCON extends TextFrame
         #return value.decode(enc)
       #else: return value
 
-      if not _.isString(value) then return value
+      if not isString(value) then return value
 
       enc = EncodedTextSpec._encodings[@encoding][0]
       return (convert value).from(enc)

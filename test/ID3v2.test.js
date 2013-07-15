@@ -46,7 +46,8 @@ vows
         'should read a year value of \'2004\'': function(id3) {
           // TODO: Mutagen upgrades all tags to v2.4 on load which in this case
           // would transform TYER (which is present) to TDRC.
-          should.equal(id3['TDRC'], '2004');
+          //should.equal(id3['TDRC'], '2004');
+          should.equal(id3['TYER'], '2004');
         }
       }
     }

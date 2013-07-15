@@ -1,5 +1,4 @@
 fs      = require 'fs'
-_       = require 'underscore'
 sprintf = require("sprintf-js").sprintf
 
 convert      = require '../text-encodings'
@@ -7,8 +6,8 @@ unsynch      = require './unsynch'
 BitPaddedInt = require '../BitPaddedInt'
 Frame        = require './frame'
 
-{EOFError} = require '../errors'
-{ID3NoHeaderError, ID3UnsupportedVersionError} = require './errors'
+{ValueError, EOFError, NotImplementedError} = require '../errors'
+{ID3NoHeaderError, ID3UnsupportedVersionError, ID3JunkFrameError} = require './errors'
 
 class ID3
   constructor: (filepath) ->
@@ -17,6 +16,11 @@ class ID3
     # name mangling to hide most of these properties. It instead favors
     # exposing the ID3 frames as iterable key-value pairs via its DictProxy
     # base class.
+    
+    Object.defineProperty(this, 'PEDANTIC', { 
+      writable: false
+      value: true,
+    });
 
     Object.defineProperty(this, 'filepath', { 
       writable: true
@@ -75,7 +79,7 @@ class ID3
     @load(filepath) if filepath?
 
   fullRead: (size) ->
-    throw new Error "Requested bytes #{size} less than zero" if (size < 0)
+    throw new ValueError "Requested bytes #{size} less than zero" if (size < 0)
     throw new EOFError "Requested #{size} of #{@_fileSize} #{@filepath}" if (@_fileSize? && size > @_fileSize)
 
     buff = new Buffer size
@@ -194,24 +198,22 @@ class ID3
     if ((@version.minor < 4) && @f_unsynch)
       try
         data = unsynch.decode(data)
-      catch err #TODO: Mutagen is only passing ValueError here
+      catch err
+        throw err unless err instanceof ValueError
 
     if (3 <= @version.minor)
       bpi = @determineBPI data,frames
       reader = () => 
-        loop
-          try
-            header = data[0...10]
-            offset = 0
+        while data.length > 0
+          header = data[0...10]
+          offset = 0
             
+          try
             name   = (convert header[offset...offset+=4]).from 'latin1'
             size   = header.readUInt32BE(offset); offset+=4
             flags  = header.readUInt16BE(offset)
           catch err
-            console.log @filepath
-            console.log err.stack, '\n'
-            # not enough header
-            return false 
+            return false  # not enough header
 
           if ((name.replace(/[\x00]+$/g, '')) == '') then return false
 
@@ -219,37 +221,36 @@ class ID3
           framedata = data[10...10+size]
           data      = data[10+size..]
           
-          break unless (size == 0) # drop empty frames
+          continue if (size == 0) # drop empty frames
 
-        tag = frames[name]
-        ##TODO: Temporary conditional workaround while we're
-        ## defining specs
-        # if tag is undefined
-        if tag is undefined or typeof tag is 'string'
-          if Frame.isValidFrameId(name) then return header + framedata
-        else
-          try
-            return @loadFramedata(tag, flags, framedata)
-          catch err
-            console.log @filepath
-            console.log err.stack, '\n'
-            ## except NotImplementedError: yield header + framedata
-            ## except ID3JunkFrameError: pass
+          tag = frames[name]
+          ##TODO: Temporary conditional workaround while we're
+          ## defining specs
+          # if tag is undefined
+          if tag is undefined or typeof tag is 'string'
+            if Frame.isValidFrameId(name) then return Buffer.concat(header, framedata)
+          else
+            try
+              return @loadFramedata(tag, flags, framedata)
+            catch err
+              if err instanceof NotImplementedError
+                return Buffer.concat(header, framedata) 
+              
+              continue if err instanceof ID3JunkFrameError
+
+              throw err
     
     else if (2 <= @version.minor)
       reader = () =>
-        loop
-          try
-            header = data[0...6]
-            offset = 0 
+        while data.length > 0
+          header = data[0...6]
+          offset = 0 
             
+          try
             name   = (convert header[offset...offset+=3]).from 'latin1'
             size   = header[offset...offset+=3]
           catch err
-            console.log @filepath
-            console.log err.stack, '\n'
-            # not enough header
-            return false
+            return false  # not enough header
 
           ## size, = struct.unpack('>L', '\x00'+size)
           size = Buffer.concat([new Buffer('00','hex'), size])
@@ -259,28 +260,28 @@ class ID3
           framedata = data[6...6+size]
           data      = data[6+size..]
 
-          break unless (size == 0) # drop empty frames
+          continue if (size == 0) # drop empty frames
         
-        tag = frames[name]
-        ##TODO: Temporary conditional workaround while we're
-        ## defining specs
-        # if tag is undefined
-        if tag is undefined or typeof tag is 'string'
-          if Frame.isValidFrameId(name) then return header + framedata
-        else
-          try
-            return @loadFramedata(tag, 0, framedata)
-          catch err
-            console.log @filepath
-            console.log err.stack, '\n'
-            ## except NotImplementedError: yield header + framedata
-            ## except ID3JunkFrameError: pass
+          tag = frames[name]
+          ##TODO: Temporary conditional workaround while we're
+          ## defining specs
+          # if tag is undefined
+          if tag is undefined or typeof tag is 'string'
+            if Frame.isValidFrameId(name) then return header + framedata
+          else
+            try
+              return @loadFramedata(tag, 0, framedata)
+            catch err
+              if err instanceof NotImplementedError
+                return Buffer.concat(header, framedata) 
+              
+              continue if err instanceof ID3JunkFrameError
+
+              throw err
   
   loadFramedata: (tag, flags, data) -> tag.fromData(tag,this,flags,data)
 
   determineBPI: (data, frames) ->
-    #TODO: Does this logic equate?
-    # EMPTY="\x00" * 10
     EMPTY="\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 
     if (@version.minor < 4) 

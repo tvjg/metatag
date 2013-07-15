@@ -1,10 +1,9 @@
 {
   "description": "metatag is a Mutagen inspired library for parsing audio metadata formats like ID3.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "dependencies": {
     "flatiron"     : "0.2.5"
-    , "underscore" : "*"
     , "sprintf-js" : "*"
     , "iconv"      : "*"
   },

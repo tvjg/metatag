@@ -103,7 +103,7 @@ vows
       },
       'whose text property contains a complicated combination of the above ': {
         topic: _g('(20)(CR)\x0030\x00\x00Another\x00(51)Hooray'),
-        'should report not balk': function(genres) {
+        'should not balk': function(genres) {
           genres.should.eql(['Alternative', 'Cover', 'Fusion', 'Another','Techno-Industrial', 'Hooray']);
         }
       },

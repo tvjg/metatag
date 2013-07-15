@@ -1,5 +1,7 @@
 Iconv = require('iconv').Iconv
 
+{UnicodeDecodeError} = require './errors'
+
 decode = 
   latin1  : new Iconv 'ISO-8859-1','UTF-8'
   utf16   : new Iconv 'UTF-16','UTF-8'
@@ -10,9 +12,12 @@ convert = (buffer) ->
   { 
     from: (encoding) ->  
       convert = decode[encoding]?.convert
-      throw new Error "Conversion from #{encoding} unsupported" unless convert 
+      throw new UnicodeDecodeError "Conversion from #{encoding} unsupported" unless convert 
 
-      (convert buffer).toString()
+      try
+        (convert buffer).toString()
+      catch err
+        throw new UnicodeDecodeError (err.message || err)
   }
 
 module.exports = convert
