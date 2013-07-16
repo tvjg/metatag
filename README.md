@@ -21,7 +21,6 @@ Todo
 * More complete support for all ID3 frames
 * Support advanced ID3 features like frame compression
 * Cleanup TODO comments
-* Use asynchronous fs methods
 * Investigate higher level parsing methods ie streams of tokens
 * Support for other metadata formats
 * Clientside support

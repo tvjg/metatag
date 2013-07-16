@@ -13,14 +13,33 @@ app.use(flatiron.plugins.cli, {
     , 'Metatag will return an array of JSON objects with tag metadata.'
     , ''
     , '-h, --help   Prints this message'
-  ]
+  ],
+  async: true
 });
 
-app.cmd(/(.+)/, function() {
+app.cmd(/(.+)/, function(filepath, next) {
 
-  var p = app.argv._[0];
-  var tag = new Metatag(p);
-  console.log(util.inspect(tag, { showHidden:true, depth: 3 }));
+  // Use promises or callbacks!
+  new Metatag(filepath, function (err, tag) {
+    if (err) {
+      console.error(err.stack);
+    } else {
+      console.log(util.inspect(tag, { showHidden:true, depth: 3 }));
+    }
+
+    next();
+  });
+
+  //new Metatag()
+    //.load(filepath)
+    //.then(function (tag) {
+      //console.log(util.inspect(tag, { showHidden:true, depth: 3 }));
+    //})
+    //.fail(function (err) {
+      //console.error(err.stack);
+    //})
+    //.fin(next)
+    //.done();
 });
 
 app.start();

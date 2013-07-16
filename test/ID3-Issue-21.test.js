@@ -14,15 +14,17 @@ vows
   .addBatch({
     'An ID3 wrapper ': {
       'loading a file with an improper extended flag': {
-        topic: new ID3(issue21),
-        'should not set the extended flag': function (id3) {
+        topic: function () {
+	  new ID3(issue21, this.callback)
+	},
+        'should not set the extended flag': function (err, id3) {
           id3.f_extended.should.eql(false);
         },
-        'should have TIT2 and TALB frames': function (id3) {
+        'should have TIT2 and TALB frames': function (err, id3) {
           id3.should.have.property('TIT2');
           id3.should.have.property('TALB');
         },
-        'should have a properly decoded value for TIT2': function (id3) {
+        'should have a properly decoded value for TIT2': function (err, id3) {
           should.equal(id3['TIT2'], 'Punk To Funk');
         }
       }
