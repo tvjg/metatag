@@ -1,7 +1,7 @@
 vows   = require('vows');
 should = require('should');
 
-Frame      = require('../lib/id3/frame');
+Frame = require('../lib/id3/frame').Frame;
 specs = require('../lib/id3/framespecs');
 
 vows

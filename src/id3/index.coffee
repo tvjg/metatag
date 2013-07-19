@@ -5,7 +5,7 @@ sprintf = require("sprintf-js").sprintf
 convert      = require '../text-encodings'
 unsynch      = require './unsynch'
 BitPaddedInt = require '../BitPaddedInt'
-Frame        = require './frame'
+{Frame}      = require './frame'
 
 {ValueError, EOFError, NotImplementedError} = require '../errors'
 {ID3NoHeaderError, ID3UnsupportedVersionError, ID3JunkFrameError} = require './errors'
@@ -113,14 +113,28 @@ class ID3
       else if @version.minor <= 2 then frames = Frame.FRAMES_2_2
 
       readFrame = @getFrameReader buff,frames
-      frame     = false
+      loadingFrames = []
       while (frame = do readFrame) isnt false
-        #TODO: Does not account for the upgrade to 2.3/2.4 tags that
-        # mutagen uses
-        if frame instanceof Frame then @add frame
-        else if frame?            then @unknownFrames.push frame
+        loadingFrames.push frame
 
-      return this
+      Q.allSettled(loadingFrames)
+        .then (results) =>
+          successes = []; errors = []
+          results.forEach (result) ->
+            if result.state is 'fulfilled'
+              successes.push(result.value)
+            else
+              errors.push(result.reason)
+
+          errors.forEach (err) ->
+            throw err unless err instanceof ID3JunkFrameError 
+
+          successes.forEach (frame) =>
+            #TODO: Does not account for the upgrade to 2.4 tags mutagen performs
+            if frame instanceof Frame then @add frame
+            else if frame?            then @unknownFrames.push frame
+
+          return this
 
     parseV1Frames = (buff) =>
       frames = ParseID3v1(buff)
@@ -260,18 +274,15 @@ class ID3
           ##TODO: Temporary conditional workaround while we're
           ## defining specs
           # if tag is undefined
-          if tag is undefined or typeof tag is 'string'
-            if Frame.isValidFrameId(name) then return Buffer.concat(header, framedata)
+          unless tag is undefined or typeof tag is 'string'
+            return @loadFramedata(tag, flags, framedata)
+              .fail (err) ->
+                if err instanceof NotImplementedError
+                  return Buffer.concat(header, framedata)
+
+                throw err
           else
-            try
-              return @loadFramedata(tag, flags, framedata)
-            catch err
-              if err instanceof NotImplementedError
-                return Buffer.concat(header, framedata)
-
-              continue if err instanceof ID3JunkFrameError
-
-              throw err
+            return Buffer.concat(header, framedata) if Frame.isValidFrameId(name)
 
     else if (2 <= @version.minor)
       reader = () =>
@@ -299,18 +310,15 @@ class ID3
           ##TODO: Temporary conditional workaround while we're
           ## defining specs
           # if tag is undefined
-          if tag is undefined or typeof tag is 'string'
-            if Frame.isValidFrameId(name) then return header + framedata
+          unless tag is undefined or typeof tag is 'string'
+            return @loadFramedata(tag, 0, framedata)
+              .fail (err) ->
+                if err instanceof NotImplementedError
+                  return Buffer.concat(header, framedata)
+
+                throw err
           else
-            try
-              return @loadFramedata(tag, 0, framedata)
-            catch err
-              if err instanceof NotImplementedError
-                return Buffer.concat(header, framedata)
-
-              continue if err instanceof ID3JunkFrameError
-
-              throw err
+            return Buffer.concat(header, framedata) if Frame.isValidFrameId(name) 
 
   loadFramedata: (tag, flags, data) -> tag.fromData(tag,this,flags,data)
 

@@ -1,3 +1,4 @@
+Q       = require('q')
 sprintf = require("sprintf-js").sprintf
 
 convert = require '../text-encodings'
@@ -97,6 +98,13 @@ Frame.isValidFrameId = (frameId) ->
 
 Frame.fromData = (cls, id3, tflags, data) ->
 
+  makeFrame = (data) ->
+    frame = new cls()
+    frame._rawdata = data
+    frame._flags = tflags
+    frame._readData(data)
+    return frame
+
   if 4 <= id3.version.minor
     throw new ID3EncryptionUnsupportedError if tflags & FLAG24_ENCRYPT
 
@@ -116,38 +124,33 @@ Frame.fromData = (cls, id3, tflags, data) ->
         throw new ID3BadUnsynchData "#{err.message}: #{data}" if id3.PEDANTIC
 
     if tflags & FLAG24_COMPRESS
-      true
-      #TODO: Need to add async support up the callchain or find synchronous zlib 
-      #zlib = require 'zlib'
-      #zlib.inflate data, (err, result) ->
-        #if not err
-          #data = result
-          #return
-
-        ## the initial mutagen that went out with QL 0.12 did not
-        ## write the 4 bytes of uncompressed size. Compensate.
-        #data = Buffer.concat(datalen_bytes, data)
-        #zlib.inflate data, (err, result) ->
-          #throw new ID3BadCompressedData "#{err.message}: #{data}" if err and id3.PEDANTIC
-          #data = result
+      zlib = require 'zlib'
+      
+      return Q
+        .nfcall(zlib.inflate, data)
+        .fail (err) ->
+          # the initial mutagen that went out with QL 0.12 did not
+          # write the 4 bytes of uncompressed size. Compensate.
+          data = Buffer.concat(datalen_bytes, data)
+          Q.nfcall(zlib.inflate, data)
+        .then (inflatedData) ->
+          (makeFrame inflatedData)
+        .fail (err) ->
+          throw new ID3BadCompressedData "#{err.message}: #{data}" if err and id3.PEDANTIC
 
   else if 3 <= id3.version.minor
     throw new ID3EncryptionUnsupportedError if tflags & FLAG23_ENCRYPT
-    true
-      ##if tflags & Frame.FLAG23_COMPRESS:
-          ##usize, = unpack('>L', data[:4])
-          ##data = data[4:]
-      ##if tflags & Frame.FLAG23_COMPRESS:
-          ##try: data = data.decode('zlib')
-          ##except zlibError, err:
-              ##if id3.PEDANTIC:
-                  ##raise ID3BadCompressedData, '%s: %r' % (err, data)
 
-  frame = new cls()
-  frame._rawdata = data
-  frame._flags = tflags
-  frame._readData(data)
-  return frame
+    if tflags & FLAG23_COMPRESS
+      #TODO: Unsure why Mutagen unpacks and never uses this
+       ##usize, = unpack('>L', data[:4])
+      data = data[4..]
+      return Q
+        .nfcall(zlib.inflate, data)
+        .fail (err) ->
+          throw new ID3BadCompressedData "#{err.message}: #{data}" if err and id3.PEDANTIC
+
+  return Q.fcall(makeFrame, data)
 
 class TextFrame extends Frame
   framespec: [ EncodingSpec('encoding'), MultiSpec('text', EncodedTextSpec('text'), sep='\u0000') ]
@@ -446,4 +449,5 @@ for cls in $FRAMES_2_2
 Frame.FRAMES = FRAMES
 Frame.FRAMES_2_2 = FRAMES_2_2
 
-module.exports = Frame
+module.exports =
+  {Frame, TextFrame, NumericTextFrame, NumericPartTextFrame, TimeStampTextFrame}

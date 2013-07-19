@@ -1,11 +1,12 @@
-var vows   = require('vows');
-var should = require('should');
-var path = require('path');
+var vows    = require('vows');
+var should  = require('should');
+var path    = require('path');
 var sprintf = require("sprintf-js").sprintf
 
-var ID3 = require('../lib/id3');
-var TCON = require('../lib/id3/frame').FRAMES.TCON;
-var GENRES = require('../lib/id3/constants').GENRES;
+var ID3     = require('../lib/id3');
+var Frame   = require('../lib/id3/frame').Frame;
+var TCON    = Frame.FRAMES.TCON;
+var GENRES  = require('../lib/id3/constants').GENRES;
 
 function _g(s) {
   var frame = new TCON({ text:s });

@@ -4,7 +4,7 @@ var join = require('path').join;
 var fs = require('fs');
 
 var ID3 = require('../lib/id3');
-var Frame = require('../lib/id3/frame');
+var Frame = require('../lib/id3/frame').Frame;
 
 var empty = join('test','data','emptyfile.mp3');
 var silence = join('test','data','silence-44-s.mp3');
@@ -61,37 +61,43 @@ vows
       },
       'loading no ID3 information': {
 	topic: new ID3(),
-	'should throw when attempting negative read': function(id3) {
+	'should throw when attempting negative read': function (id3) {
 	  (function() {
 	    id3.fullRead({ fileSize: 0, position:0 }, -3);
 	  }).should.throwError(/less than zero/i);
 	},
-	'should throw when attempting to read beyond file size': function(id3) {
+	'should throw when attempting to read beyond file size': function (id3) {
 	  (function() {
 	    id3.fullRead({ fileSize: 0, position:0 }, 3);
 	  }).should.throwError();
 	}
       },
       'with an unsynchronization flag': {
-	topic: new ID3(),
-	'should decode a value of \'\\xffab\'': function(id3) {
+	topic: function () {
+	  var id3 = new ID3();
 	  id3._flags = 0x80;
-	  should.equal(
-	    id3.loadFramedata(Frame.FRAMES['TPE2'], 0, badsync), '\xffab');
+	  id3.loadFramedata(Frame.FRAMES['TPE2'], 0, badsync).nodeify(this.callback);
+	},
+	'should decode a value of \'\\xffab\'': function (err, frame) {
+	  should.equal(frame, '\xffab');
 	}
       },
       'with an unsynchronization flag on a frame': {
-	topic: new ID3(),
-	'should decode a value of \'\\xfab\'': function (id3) {
+	topic: function () {
+	  var id3 = new ID3();
 	  id3._flags = 0x00;
-	  should.equal(
-	    id3.loadFramedata(Frame.FRAMES['TPE2'], 0x02, badsync), '\xffab');
+	  id3.loadFramedata(Frame.FRAMES['TPE2'], 0x02, badsync).nodeify(this.callback);
+	},
+	'should decode a value of \'\\xfab\'': function (err, frame) {
+	  should.equal(frame, '\xffab');
 	}
       },
       'with no unsynchronization flag': {
-	topic: new ID3(),
-	'should decode a value of \'[\'\\xff\',\'ab\']\'': function(id3) {
-	  tag = id3.loadFramedata(Frame.FRAMES["TPE2"], 0, badsync);
+	topic: function () {
+	  var id3 = new ID3();
+	  id3.loadFramedata(Frame.FRAMES['TPE2'], 0, badsync).nodeify(this.callback);
+	},
+	'should decode a value of \'[\'\\xff\',\'ab\']\'': function(err, tag) {
 	  tag.text.should.eql(['\xff', 'ab']);
 	}
       }
