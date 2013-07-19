@@ -278,11 +278,11 @@ class ID3
             return @loadFramedata(tag, flags, framedata)
               .fail (err) ->
                 if err instanceof NotImplementedError
-                  return Buffer.concat(header, framedata)
+                  return Buffer.concat([header, framedata])
 
                 throw err
           else
-            return Buffer.concat(header, framedata) if Frame.isValidFrameId(name)
+            return Buffer.concat([header, framedata]) if Frame.isValidFrameId(name)
 
     else if (2 <= @version.minor)
       reader = () =>
@@ -314,11 +314,11 @@ class ID3
             return @loadFramedata(tag, 0, framedata)
               .fail (err) ->
                 if err instanceof NotImplementedError
-                  return Buffer.concat(header, framedata)
+                  return Buffer.concat([header, framedata])
 
                 throw err
           else
-            return Buffer.concat(header, framedata) if Frame.isValidFrameId(name) 
+            return Buffer.concat([header, framedata]) if Frame.isValidFrameId(name) 
 
   loadFramedata: (tag, flags, data) -> tag.fromData(tag,this,flags,data)
 

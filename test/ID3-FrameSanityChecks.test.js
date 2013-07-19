@@ -20,6 +20,9 @@ _buff1           = new Buffer('54543100008300','hex');
 _buff2           = new Buffer(Array(16).join('123456789abcdef'));
 buff22DirectInts = Buffer.concat([_buff1, _buff2]);
 
+// Unknown v2.2 framedata
+unknownFrameData = new Buffer('58595A00000100','hex');
+
 vows
   .describe('Frame Sanity Checks')
   .addBatch({
@@ -86,6 +89,21 @@ vows
       },
       'should return nothing when read': function (frames) {
         frames.should.be.empty;
+      }
+    },
+    'An unknown v2.2 frame with a valid FrameID': {
+      topic: function () {
+        var readFrame = _22.getFrameReader(unknownFrameData, {});
+
+        var loadingFrames = [], frame = false;
+        while (frame = readFrame()) {
+          loadingFrames.push(frame);
+        }
+
+        return loadingFrames;
+      },
+      'should return the raw data': function (frames) {
+        frames.should.eql([unknownFrameData]);
       }
     },
   })

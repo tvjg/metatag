@@ -81,20 +81,8 @@ class Frame
 
 Frame.toString = () -> @name
 
-Frame.isValidFrameId = (frameId) ->
-  upperBound  = 'Z'.charCodeAt(0)
-  lowerBound  = 'A'.charCodeAt(0)
-  upperBound1 = '9'.charCodeAt(0)
-  lowerBound1 = '0'.charCodeAt(0)
-
-  isAlphaNumeric = true
-  for i in [0..frameId.length]
-    char = frameId.charCodeAt(i)
-    if char <= upperBound and char >= lowerBound then continue
-    else if char <= upperBound1 and char >= lowerBound1 then continue
-    else isAlphaNumeric = false
-
-  return isAlphaNumeric
+isUpperCaseAlphanumeric = /^[A-Z0-9]+$/
+Frame.isValidFrameId = (frameId) -> isUpperCaseAlphanumeric.test(frameId)
 
 Frame.fromData = (cls, id3, tflags, data) ->
 
@@ -131,7 +119,7 @@ Frame.fromData = (cls, id3, tflags, data) ->
         .fail (err) ->
           # the initial mutagen that went out with QL 0.12 did not
           # write the 4 bytes of uncompressed size. Compensate.
-          data = Buffer.concat(datalen_bytes, data)
+          data = Buffer.concat([datalen_bytes, data])
           Q.nfcall(zlib.inflate, data)
         .then (inflatedData) ->
           (makeFrame inflatedData)
