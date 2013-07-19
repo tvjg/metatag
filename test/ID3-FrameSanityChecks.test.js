@@ -12,6 +12,7 @@ NumericPartTextFrame = F.NumericPartTextFrame;
 TPE1 = Frame.FRAMES.TPE1;
 
 convert = require('../lib/text-encodings');
+unsynch = require('../lib/id3/unsynch');
 
 _22 = new ID3(); _22.version = { major: 2, minor: 2, sub: 0 }
 _23 = new ID3(); _23.version = { major: 2, minor: 3, sub: 0 }
@@ -170,6 +171,38 @@ vows
           'should decode text \'this is a/test\'': function (err, frame) {
             frame.text.should.eql(['this is a/test']);
           }
+        }
+      }
+    },
+    'Unsynchronization decode passed': {
+      '\'\\xff\\xff\\xff\\xff\'': {
+        topic: new Buffer('ffffffff', 'hex'),
+        'should throw a ValueError': function (data) {
+          (function () {
+            unsynch.decode(data);
+          }).should.throwError(/invalid sync-safe/);
+        }
+      },
+      '\'\\xff\\xf0\\x0f\\x00\'': {
+        topic: new Buffer('fff00f00', 'hex'),
+        'should throw a ValueError': function (data) {
+          (function () {
+            unsynch.decode(data);
+          }).should.throwError(/invalid sync-safe/);
+        }
+      },
+      '\'\\xff\\xe0\'': {
+        topic: new Buffer('ffe0', 'hex'),
+        'should throw a ValueError': function (data) {
+          (function () {
+            unsynch.decode(data);
+          }).should.throwError(/invalid sync-safe/);
+        }
+      },
+      '\'\\xff\\x44\'': {
+        topic: new Buffer('ff44', 'hex'),
+        'should decode \'\\xff\\x44\'': function (data) {
+          unsynch.decode(data).should.eql(data);
         }
       }
     },
