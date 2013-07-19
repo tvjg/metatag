@@ -114,8 +114,8 @@ class ID3
 
       readFrame = @getFrameReader buff,frames
       loadingFrames = []
-      while (frame = do readFrame) isnt false
-        loadingFrames.push frame
+      while (frame = do readFrame)
+        loadingFrames.push(frame)
 
       Q.allSettled(loadingFrames)
         .then (results) =>
