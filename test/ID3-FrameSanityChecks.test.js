@@ -9,6 +9,8 @@ TextFrame            = F.TextFrame;
 NumericTextFrame     = F.NumericTextFrame;
 NumericPartTextFrame = F.NumericPartTextFrame;
 
+TPE1 = Frame.FRAMES.TPE1;
+
 convert = require('../lib/text-encodings');
 
 _22 = new ID3(); _22.version = { major: 2, minor: 2, sub: 0 }
@@ -104,6 +106,71 @@ vows
       },
       'should return the raw data': function (frames) {
         frames.should.eql([unknownFrameData]);
+      }
+    },
+    'A TPE1 frame': {
+      'passed the zlib compressed test data': {
+        topic: function() {
+          var data = new Buffer('0000000f789c6328c9c82c5600a244fd92d4e21200267f0525','hex');
+          Frame.fromData(TPE1, _24, 0x9, data).nodeify(this.callback);
+        },
+        'should detect latin-1 encoding': function (err, frame) {
+          frame.encoding.should.eql(0);
+        },
+        'should decode text \'this is a/test\'': function (err, frame) {
+          frame.text.should.eql(['this is a/test']);
+        }
+      },
+      'passed uncompressed data with a datalen flag': {
+        topic: function() {
+          var data = new Buffer('0000000600412074657374','hex');
+          Frame.fromData(TPE1, _24, 0x01, data).nodeify(this.callback);
+        },
+        'should detect latin-1 encoding': function (err, frame) {
+          frame.encoding.should.eql(0);
+        },
+        'should decode text \'A test\'': function (err, frame) {
+          frame.text.should.eql(['A test']);
+        }
+      },
+      'passed the data \'\\x03this is a test\'': {
+        topic: function() {
+          var data = new Buffer('037468697320697320612074657374','hex');
+          return Frame.fromData(TPE1, _23, 0x00, data).nodeify(this.callback);
+        },
+        'should detect UTF8 encoding': function (err, frame) {
+          frame.encoding.should.eql(3);
+        },
+        'should decode text \'this is a test\'': function (err, frame) {
+          frame.text.should.eql(['this is a test']);
+        }
+      },
+      'passed zlib compressed UTF16 data': {
+        topic: function () {
+          return new Buffer('0000001f789c63fcffaf8421832193a19841014a2632e8339430a402d9250c0087c60723','hex');
+        },
+        'in a v2.3 tag': {
+          topic: function (data) {
+            return Frame.fromData(TPE1, _23, 0x80, data).nodeify(this.callback);
+          },
+          'should detect UTF16 encoding': function (err, frame) {
+            frame.encoding.should.eql(1);
+          },
+          'should decode text \'this is a/test\'': function (err, frame) {
+            frame.text.should.eql(['this is a/test']);
+          }
+        },
+        'in a v2.4 tag': {
+          topic: function (data) {
+            return Frame.fromData(TPE1, _24, 0x08, data).nodeify(this.callback);
+          },
+          'should detect UTF16 encoding': function (err, frame) {
+            frame.encoding.should.eql(1);
+          },
+          'should decode text \'this is a/test\'': function (err, frame) {
+            frame.text.should.eql(['this is a/test']);
+          }
+        }
       }
     },
   })

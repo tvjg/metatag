@@ -130,11 +130,15 @@ Frame.fromData = (cls, id3, tflags, data) ->
     throw new ID3EncryptionUnsupportedError if tflags & FLAG23_ENCRYPT
 
     if tflags & FLAG23_COMPRESS
+      zlib = require 'zlib'
+
       #TODO: Unsure why Mutagen unpacks and never uses this
        ##usize, = unpack('>L', data[:4])
       data = data[4..]
       return Q
         .nfcall(zlib.inflate, data)
+        .then (inflatedData) ->
+          (makeFrame inflatedData)
         .fail (err) ->
           throw new ID3BadCompressedData "#{err.message}: #{data}" if err and id3.PEDANTIC
 
