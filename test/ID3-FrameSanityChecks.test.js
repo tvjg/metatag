@@ -10,6 +10,7 @@ NumericTextFrame     = F.NumericTextFrame;
 NumericPartTextFrame = F.NumericPartTextFrame;
 
 TPE1 = Frame.FRAMES.TPE1;
+COMM = Frame.FRAMES.COMM;
 
 convert = require('../lib/text-encodings');
 unsynch = require('../lib/id3/unsynch');
@@ -206,5 +207,27 @@ vows
         }
       }
     },
+    'Two COMM frames': {
+      'with diffent text properties': {
+        topic: new COMM({text: 'a'}).HashKey,
+        'should have the same HashKey': function (key) {
+          key.should.equal(new COMM({text: 'b'}).HashKey);
+        }
+      },
+      'with different descriptions': {
+        topic: new COMM({desc: 'a'}).HashKey,
+        'should have differing HashKey properties': function (key) {
+          key.should.not.equal(new COMM({desc: 'b'}).HashKey);
+        }
+      },
+      'with different languages': {
+        topic: new COMM({lang: 'abc'}).HashKey,
+        'should have differing HashKey properties': function (key) {
+          key.should.not.equal(new COMM({lang: 'def'}).HashKey);
+        }
+      }
+    }
+
+    //TODO: Add remainder of frame sanity check tests
   })
   .export(module)

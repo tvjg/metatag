@@ -188,7 +188,7 @@ class COMM extends TextFrame
       #TODO: Mutagen uses format string %s:%s:%r which yields a repr for lang.
       # My guess is this may be used for writes, so I'm unsure if neccessary
       # here.
-      get: () -> sprintf('%s:%s:%s', @FrameID, @desc, @lang)
+      get: () -> sprintf('%s:%s:%s', @FrameID, @desc || 'None', @lang || 'None')
     });
     
 ## Content type (Genre)
