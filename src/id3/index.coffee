@@ -291,14 +291,14 @@ class ID3
           offset = 0
 
           try
-            name   = (convert header[offset...offset+=3]).from 'latin1'
-            size   = header[offset...offset+=3]
+            name = (convert header[offset...offset+= 3]).from 'latin1'
+
+            size = header[offset...offset+= 3]
+            size = Buffer.concat([new Buffer('00','hex'), size])
+            size = size.readUInt32BE(0)
           catch err
             return false  # not enough header
 
-          ## size, = struct.unpack('>L', '\x00'+size)
-          size = Buffer.concat([new Buffer('00','hex'), size])
-          size = size.readUInt32BE(0)
           if ((name.replace(/[\x00]+$/g, '')) == '') then return false
 
           framedata = data[6...6+size]
