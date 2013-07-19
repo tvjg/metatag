@@ -11,7 +11,7 @@
   "devDependencies": {
     "cli-easy": "*",
     "vows": "*",
-    "should": "*",
+    "should": "git://github.com/dirtyrottenscoundrel/should.js.git#valueOf-instanceOf-fix",
     "rewire": "*"
   },
   "main": "lib/metatag.js",
