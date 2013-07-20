@@ -2,9 +2,10 @@ var vows   = require('vows');
 var should = require('should');
 var rewire = require('rewire');
 
-var ID3 = rewire('../lib/id3');
+var ID3    = require('../lib/id3');
+var Parser = rewire('../lib/id3/parser');
 
-ID3.__set__('fs', {
+Parser.__set__('fs', {
   read: function(fd, buff, offset, size, position, cb) {
     var headerLoads = {
       'header22'                  : '49443302000000000000',
@@ -41,7 +42,8 @@ vows
 	topic: function () {
 	  var id3 = new ID3();
 	  var context = { fd:'header22', position:0 };
-	  id3.loadHeader(context).nodeify(this.callback);
+          var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should have a minor revision of 2': function (err, id3) {
 	  id3.version.minor.should.equal(2);
@@ -52,7 +54,8 @@ vows
 	topic: function () {
 	  var id3 = new ID3();
 	  var context = { fd:'header21', position:0 };
-	  id3.loadHeader(context).nodeify(this.callback);
+          var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should throw a not supported error': function (err, id3) {
 	  err.should.match(/not supported/);
@@ -63,7 +66,8 @@ vows
 	topic: function () {
 	  var id3 = new ID3();
 	  var context = { fd:'shortHeader', position:0 };
-	  id3.loadHeader(context).nodeify(this.callback);
+          var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should throw an end of file error': function (err, id3) {
 	  err.should.match(/end of file/i);
@@ -74,7 +78,8 @@ vows
 	topic: function () {
 	  var id3 = new ID3();
 	  var context = { fd:'header24Extended', position:0 };
-	  id3.loadHeader(context).nodeify(this.callback);
+          var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should have a size of 1 byte': function (err, id3) {
 	  id3.extSize.should.eql(1);
@@ -88,7 +93,8 @@ vows
 	topic: function () {
 	  var id3 = new ID3();
 	  var context = { fd:'header23Extended', position:0 };
-	  id3.loadHeader(context).nodeify(this.callback);
+          var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should have a size of 6 bytes': function (err, id3) {
 	  id3.extSize.should.eql(6);
@@ -102,7 +108,8 @@ vows
 	topic: function () {
 	  var id3 = new ID3();
 	  var context = { fd:'header24AllowFooter', position:0 };
-	  id3.loadHeader(context).nodeify(this.callback);
+          var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should allow a footer': function (err, id3) {
 	  id3.f_footer.should.eql(true);
@@ -113,7 +120,8 @@ vows
 	topic: function () {
 	  var id3 = new ID3();
 	  var context = { fd:'header24ExtendedButNot', position:0 };
-	  id3.loadHeader(context).nodeify(this.callback);
+          var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should yield an extended size of 0': function (err, id3) {
 	  id3.extSize.should.eql(0);
@@ -127,7 +135,8 @@ vows
 	topic: function () {
 	  var id3 = new ID3();
 	  var context = { fd:'header24ExtendedButNotTag', position:0 };
-	  id3.loadHeader(context).nodeify(this.callback);
+          var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should throw an end of file error': function (err, id3) {
 	  err.should.match(/end of file/i);

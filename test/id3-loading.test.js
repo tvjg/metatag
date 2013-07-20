@@ -4,6 +4,7 @@ var join = require('path').join;
 var fs = require('fs');
 
 var ID3 = require('../lib/id3');
+var Parser = require('../lib/id3/parser');
 var Frame = require('../lib/id3/frame').Frame;
 
 var empty = join('test','data','emptyfile.mp3');
@@ -37,7 +38,8 @@ vows
 	    fd       : fs.openSync(empty,'r'),
 	    position : 0
 	  };
-	  id3.loadHeader(context).nodeify(this.callback);
+	  var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should throw an end of file error': function (err, id3) {
 	  err.should.match(/end of file/i);
@@ -50,7 +52,8 @@ vows
 	    fd       : fs.openSync(silence,'r'),
 	    position : 0
 	  };
-	  id3.loadHeader(context).nodeify(this.callback);
+	  var parser = new Parser(id3, context);
+	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should read a minor revision of 3': function (err, id3) {
 	  id3.version.minor.should.equal(3);
@@ -60,15 +63,18 @@ vows
 	}
       },
       'loading no ID3 information': {
-	topic: new ID3(),
-	'should throw when attempting negative read': function (id3) {
+	topic: function () {
+	  var tag = new ID3();
+	  return new Parser(tag, { fileSize: 0, position:0 });
+	},
+	'should throw when attempting negative read': function (parser) {
 	  (function() {
-	    id3.fullRead({ fileSize: 0, position:0 }, -3);
+	    parser.read(-3);
 	  }).should.throwError(/less than zero/i);
 	},
-	'should throw when attempting to read beyond file size': function (id3) {
+	'should throw when attempting to read beyond file size': function (parser) {
 	  (function() {
-	    id3.fullRead({ fileSize: 0, position:0 }, 3);
+	    parser.read(3);
 	  }).should.throwError();
 	}
       },
