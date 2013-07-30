@@ -10,6 +10,7 @@ isArray = require('util').isArray
 
 class Spec
   constructor: (name) ->
+    return new Spec(arguments...) unless this instanceof Spec
     @name = name
 
 class ByteSpec extends Spec
@@ -98,6 +99,15 @@ class MultiSpec extends Spec
           #for val in value ]
       throw new ValueError "Invalid MultiSpec data: #{value}"
 
+class BinaryDataSpec extends Spec
+  constructor: (name) ->
+    return new BinaryDataSpec(arguments...) unless this instanceof BinaryDataSpec
+    super name
+
+  read: (frame, data) -> [data, '']
+
+  validate: (frame, value) -> value.toString()  #TODO: Unsure about this
+
 class EncodedTextSpec extends Spec
 
   @_encodings = [
@@ -146,6 +156,28 @@ class EncodedTextSpec extends Spec
 #
 class EncodedNumericTextSpec extends EncodedTextSpec
 class EncodedNumericPartTextSpec extends EncodedTextSpec
+
+class Latin1TextSpec extends EncodedTextSpec
+  constructor: (name) ->
+    return new Latin1TextSpec(arguments...) unless this instanceof Latin1TextSpec
+    super name
+
+  read: (frame, data) ->
+    hexStr = data.toString 'hex'
+    hexArr = hexStr.match /(.{2})/g
+
+    ret = ''
+    offset = hexArr.indexOf '00'
+    if offset isnt -1
+      stringOffset = offset * 2
+      [data, ret] = [ hexStr[0...stringOffset], hexStr[stringOffset+2..] ]
+
+    data = new Buffer(data, 'hex')
+    ret = new Buffer(ret, 'hex')
+
+    return [(convert data).from('latin1'), ret]
+
+  validate: (frame, value) -> value
 
 ## A time stamp in ID3v2 format.
 
@@ -219,9 +251,11 @@ module.exports = {
   EncodingSpec
   StringSpec
   MultiSpec
+  BinaryDataSpec
   EncodedTextSpec
   EncodedNumericTextSpec
   EncodedNumericPartTextSpec
+  Latin1TextSpec
   ID3TimeStamp
   TimeStampSpec
 }

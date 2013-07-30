@@ -11,6 +11,7 @@ unsynch = require './unsynch'
   ByteSpec, EncodingSpec, StringSpec, MultiSpec
   EncodedTextSpec, EncodedNumericTextSpec
   EncodedNumericPartTextSpec, TimeStampSpec
+  Latin1TextSpec, BinaryDataSpec
 } = require './framespecs'
 
 FLAG23_ALTERTAG     = 0x8000
@@ -37,7 +38,7 @@ isString = (a) -> Object.prototype.toString.call(a) == "[object String]"
 # ID3 tags are split into frames. Each frame has a potentially
 # different structure, and so this base class is not very featureful.
 class Frame
-  
+
   nullChars = ///
     ^ (?: 0{2} )+    |  # leading null characters [00] in hex
       (?: 0{2} )+ $     # trailing null chars [00] in hex
@@ -67,7 +68,7 @@ class Frame
     odata = data
     for spec in @framespec
       throw new ID3JunkFrameError unless data.length > 0
-      
+
       try
         [value, data] = spec.read(this, data)
       catch err
@@ -103,7 +104,7 @@ Frame.fromData = (cls, id3, tflags, data) ->
       ## all we need are the raw bytes.
       datalen_bytes = data[...4]
       data = data[4..]
-    
+
     if tflags & FLAG24_UNSYNCH or id3.f_unsynch
       try
         data = unsynch.decode(data)
@@ -113,7 +114,7 @@ Frame.fromData = (cls, id3, tflags, data) ->
 
     if tflags & FLAG24_COMPRESS
       zlib = require 'zlib'
-      
+
       return Q
         .nfcall(zlib.inflate, data)
         .fail (err) ->
@@ -190,7 +191,7 @@ class COMM extends TextFrame
       # here.
       get: () -> sprintf('%s:%s:%s', @FrameID, @desc || 'None', @lang || 'None')
     });
-    
+
 ## Content type (Genre)
 
 ## ID3 has several ways genres can be represented; for convenience,
@@ -271,10 +272,28 @@ class TCON extends TextFrame
       enc = EncodedTextSpec._encodings[@encoding][0]
       return (convert value).from(enc)
 
+# Attached (or linked) Picture.
+#
+# Attributes:
+# encoding -- text encoding for the description
+# mime -- a MIME type (e.g. image/jpeg) or '-->' if the data is a URI
+# type -- the source of the image (3 is the album front cover)
+# desc -- a text description of the image
+# data -- raw image data, as a byte string
+#
+# Mutagen will automatically compress large images when saving tags.
+class APIC extends Frame
+  framespec: [
+    EncodingSpec('encoding'),
+    Latin1TextSpec('mime'),
+    ByteSpec('type'),
+    EncodedTextSpec('desc'),
+    BinaryDataSpec('data')
+  ]
+
 # v2.3
 FRAMES = {
   "AENC" : "Audio encryption",
-  "APIC" : "Attached picture",
   "COMR" : "Commercial frame",
   "ENCR" : "Encryption method registration",
   "EQUA" : "Equalization",
@@ -334,6 +353,7 @@ FRAMES = {
 # lookup for determineBPI. Will eventually
 # replace FRAMES entirely.
 $FRAMES = [
+  APIC,                                     # Attached picture
   class TALB extends TextFrame,            # Album/Movie/Show title
   class TBPM extends NumericTextFrame,     # BPM (beats per minute)
   class TCOM extends TextFrame,            # Composer
