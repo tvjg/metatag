@@ -12,6 +12,8 @@ NumericPartTextFrame = F.NumericPartTextFrame;
 
 TPE1 = Frame.FRAMES.TPE1;
 COMM = Frame.FRAMES.COMM;
+TIT2 = Frame.FRAMES.TIT2;
+TXXX = Frame.FRAMES.TXXX;
 
 convert = require('../lib/text-encodings');
 unsynch = require('../lib/id3/unsynch');
@@ -55,6 +57,13 @@ vows
 	frame.should.be.an.instanceOf(TextFrame);
       }
     },
+    'A TXXX frame initialized with {desc:\'d\', text:\'text\'}': {
+      topic: new TXXX({desc:'d', text:'text'}),
+      'should be an instance of TXXX': function (frame) {
+        frame.should.be.an.instanceOf(TXXX);
+      }
+    },
+
     // Mutagen uses the rather cryptic test name test_22_uses_direct_ints. I
     // believe this relates to 2.2 using unpadded ints, but I'm not clear on
     // how exactly this relates to the provided test data.
@@ -214,8 +223,28 @@ vows
 	}
       }
     },
+    'Standard TextFrames with differing text properties': {
+      topic: new TIT2({text: 'a'}).HashKey,
+      'should have the same HashKey': function (key) {
+        key.should.equal(new TIT2({text: 'b'}).HashKey);
+      }
+    },
+    'Two TXXX frames': {
+      'with different text properties': {
+	topic: new TXXX({text: 'a'}).HashKey,
+	'should have the same HashKey': function (key) {
+	  key.should.equal(new TXXX({text: 'b'}).HashKey);
+	}
+      },
+      'with different descriptions': {
+	topic: new TXXX({desc: 'a'}).HashKey,
+	'should have differing HashKey properties': function (key) {
+	  key.should.not.equal(new TXXX({desc: 'b'}).HashKey);
+	}
+      }
+    },
     'Two COMM frames': {
-      'with diffent text properties': {
+      'with different text properties': {
 	topic: new COMM({text: 'a'}).HashKey,
 	'should have the same HashKey': function (key) {
 	  key.should.equal(new COMM({text: 'b'}).HashKey);

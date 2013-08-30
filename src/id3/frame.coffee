@@ -291,6 +291,28 @@ class APIC extends Frame
     BinaryDataSpec('data')
   ]
 
+## User-defined text data.
+
+## TXXX frames have a 'desc' attribute which is set to any Unicode value (though
+## the encoding of the text and the description must be the same).  Many taggers
+## use this frame to store freeform keys.
+class TXXX extends TextFrame
+  framespec: [
+    EncodingSpec('encoding'),
+    EncodedTextSpec('desc'),
+    MultiSpec('text', EncodedTextSpec('text'), '\u0000')
+  ]
+
+  constructor: () ->
+    super
+    Object.defineProperty(this, 'HashKey', {
+      enumerable: true,
+      #TODO: Mutagen uses format string %s:%s:%r which yields a repr for lang.
+      # My guess is this may be used for writes, so I'm unsure if neccessary
+      # here.
+      get: () -> sprintf('%s:%s', @FrameID, @desc || 'None')
+    })
+
 # v2.3
 FRAMES = {
   "AENC" : "Audio encryption",
@@ -314,27 +336,6 @@ FRAMES = {
   "RVRB" : "Reverb",
   "SYLT" : "Synchronized lyric/text",
   "SYTC" : "Synchronized tempo codes",
-  "TDLY" : "Playlist delay",
-  "TENC" : "Encoded by",
-  "TEXT" : "Lyricist/Text writer",
-  "TFLT" : "File type",
-  "TKEY" : "Initial key",
-  "TLAN" : "Language(s)",
-  "TMED" : "Media type",
-  "TOAL" : "Original album/movie/show title",
-  "TOFN" : "Original filename",
-  "TOLY" : "Original lyricist(s)/text writer(s)",
-  "TOPE" : "Original artist(s)/performer(s)",
-  "TORY" : "Original release year",
-  "TOWN" : "File owner/licensee",
-  "TPUB" : "Publisher",
-  "TRDA" : "Recording dates",
-  "TRSN" : "Internet radio station name",
-  "TRSO" : "Internet radio station owner",
-  "TSIZ" : "Size",
-  "TSRC" : "ISRC (international standard recording code)",
-  "TSSE" : "Software/Hardware and settings used for encoding",
-  "TXXX" : "User defined text information frame",
   "UFID" : "Unique file identifier",
   "USER" : "Terms of use",
   "USLT" : "Unsychronized lyric/text transcription",
@@ -353,33 +354,62 @@ FRAMES = {
 # lookup for determineBPI. Will eventually
 # replace FRAMES entirely.
 $FRAMES = [
-  APIC,                                     # Attached picture
   class TALB extends TextFrame,            # Album/Movie/Show title
   class TBPM extends NumericTextFrame,     # BPM (beats per minute)
   class TCOM extends TextFrame,            # Composer
+  TCON,                                    # Content type
   class TCOP extends TextFrame,            # Copyright message
   class TCMP extends NumericTextFrame,     # iTunes Compilation Flag
   class TDAT extends TextFrame,            # Date of recording (DDMM)
+  class TDEN extends TimeStampTextFrame,   # Encoding Time
+  class TDOR extends TimeStampTextFrame,   # Original Release Time
+  class TDLY extends NumericTextFrame,     # Playlist delay
   class TDRC extends TimeStampTextFrame,   # Recording Time
+  class TDRL extends TimeStampTextFrame,   # Release Time
+  class TDTG extends TimeStampTextFrame,   # Tagging Time
+  class TENC extends TextFrame,            # Encoded by
+  class TEXT extends TextFrame,            # Lyricist/Text writer
+  class TFLT extends TextFrame,            # File type
   class TIME extends TextFrame,            # Time of recording (HHMM)
-  class TLEN extends NumericTextFrame,     # Length
   class TIT1 extends TextFrame,            # Content group description
   class TIT2 extends TextFrame,            # Title/songname/content description
   class TIT3 extends TextFrame,            # Conductor/performer refinement
+  class TKEY extends TextFrame,            # Initial key
+  class TLAN extends TextFrame,            # Language(s)
+  class TLEN extends NumericTextFrame,     # Length
+  class TMED extends TextFrame,            # Media type
+  class TMOO extends TextFrame,            # Mood
+  class TOAL extends TextFrame,            # Original album/movie/show title
+  class TOFN extends TextFrame,            # Original filename
+  class TOLY extends TextFrame,            # Original lyricist(s)/text writer(s)
+  class TOPE extends TextFrame,            # Original artist(s)/performer(s)
+  class TORY extends NumericTextFrame,     # Original release year
+  class TOWN extends TextFrame,            # File owner/licensee
   class TPE1 extends TextFrame,            # Lead performer(s)/Soloist(s)
   class TPE2 extends TextFrame,            # Band/orchestra/accompaniment
   class TPE3 extends TextFrame,            # Conductor
   class TPE4 extends TextFrame,            # Interpreter/remixer/modifier
   class TPOS extends NumericPartTextFrame, # Part of a set
+  class TPRO extends TextFrame,            # Produced (P)
+  class TPUB extends TextFrame,            # Publisher
   class TRCK extends NumericPartTextFrame, # Track number/Position in set
+  class TRDA extends TextFrame,            # Recording dates
+  class TRSN extends TextFrame,            # Internet radio station name
+  class TRSO extends TextFrame,            # Internet radio station owner
+  class TSIZ extends NumericTextFrame,     # Size
+  class TSO2 extends TextFrame,            # iTunes Album Artist Sort
+  class TSOA extends TextFrame,            # Album Sort Order key
+  class TSOC extends TextFrame,            # iTunes Composer Sort
+  class TSOP extends TextFrame,            # Perfomer Sort Order key
+  class TSOT extends TextFrame,            # Title Sort Order key"
+  class TSRC extends TextFrame,            # ISRC (international standard recording code)
+  class TSSE extends TextFrame,            # Software/Hardware and settings used for encoding
+  class TSST extends TextFrame,            # Set Subtitle
   class TYER extends NumericTextFrame,     # Year
-  class TDEN extends TimeStampTextFrame,   # Encoding Time
-  class TDOR extends TimeStampTextFrame,   # Original Release Time
-  class TDRC extends TimeStampTextFrame,   # Recording Time
-  class TDRL extends TimeStampTextFrame,   # Release Time
-  class TDTG extends TimeStampTextFrame,   # Tagging Time
+  TXXX,                                    # User defined text information frame
+
   COMM,                                    # Comments
-  TCON                                     # Content type
+  APIC,                                    # Attached picture
 ]
 
 for cls in $FRAMES
@@ -404,24 +434,6 @@ FRAMES_2_2 = {
   "RVA" : "Relative volume adjustment",
   "SLT" : "Synchronized lyric/text",
   "STC" : "Synced tempo codes",
-  "TDY" : "Playlist delay",
-  "TEN" : "Encoded by",
-  "TFT" : "File type",
-  "TKE" : "Initial key",
-  "TLA" : "Language(s)",
-  "TMT" : "Media type",
-  "TOA" : "Original artist(s)/performer(s)",
-  "TOF" : "Original filename",
-  "TOL" : "Original Lyricist(s)/text writer(s)",
-  "TOR" : "Original release year",
-  "TOT" : "Original album/Movie/Show title",
-  "TPB" : "Publisher",
-  "TRC" : "ISRC (International Standard Recording Code)",
-  "TRD" : "Recording dates",
-  "TSI" : "Size",
-  "TSS" : "Software/hardware and settings used for encoding",
-  "TXT" : "Lyricist/text writer",
-  "TXX" : "User defined text information frame",
   "UFI" : "Unique file identifier",
   "ULT" : "Unsychronized lyric/text transcription",
   "WAF" : "Official audio file webpage",
@@ -434,14 +446,6 @@ FRAMES_2_2 = {
 }
 
 $FRAMES_2_2 = [
-  class TAL extends TALB,    # Album/Movie/Show title
-  class TBP extends TBPM,    # BPM (beats per minute)
-  class TCM extends TCOM,    # Composer
-  class TCR extends TCOP,    # Copyright message
-  class TCO extends TCMP,    # iTunes Compilation Flag
-  class TDA extends TDAT,    # Date of recording (DDMM)
-  class TIM extends TIME,    # Time of recording (HHMM)
-  class TLE extends TLEN,    # Length
   class TT1 extends TIT1,    # Content group description
   class TT2 extends TIT2,    # Title/songname/content description
   class TT3 extends TIT3,    # Conductor/performer refinement
@@ -449,11 +453,38 @@ $FRAMES_2_2 = [
   class TP2 extends TPE2,    # Band/orchestra/accompaniment
   class TP3 extends TPE3,    # Conductor
   class TP4 extends TPE4,    # Interpreter/remixer/modifier
+  class TCM extends TCOM,    # Composer
+  class TXT extends TEXT,    # Lyricist/text writer
+  class TLA extends TLAN,    # Language(s)
+  class TCO extends TCON,    # Content type
+  class TAL extends TALB,    # Album/Movie/Show title
   class TPA extends TPOS,    # Part of a set
   class TRK extends TRCK,    # Track number/Position in set
+  class TRC extends TSRC,    # ISRC (International Standard Recording Code)
   class TYE extends TYER,    # Year
+  class TDA extends TDAT,    # Date of recording (DDMM)
+  class TIM extends TIME,    # Time of recording (HHMM)
+  class TRD extends TRDA     # Recording dates
+  class TMT extends TMED     # Media type
+  class TFT extends TFLT,    # File type
+  class TBP extends TBPM,    # BPM (beats per minute)
+  class TCP extends TCMP,    # iTunes Compilation Flag
+  class TCR extends TCOP,    # Copyright message
+  class TPB extends TPUB,    # Publisher
+  class TEN extends TENC,    # Encoded by
+  class TSS extends TSSE,    # Software/hardware and settings used for encoding
+  class TOF extends TOFN,    # Original filename
+  class TLE extends TLEN,    # Length
+  class TSI extends TSIZ,    # Size
+  class TDY extends TDLY,    # Playlist delay
+  class TKE extends TKEY,    # Initial key
+  class TOT extends TOAL,    # Original album/Movie/Show title
+  class TOA extends TOPE,    # Original artist(s)/performer(s)
+  class TOL extends TOLY,    # Original Lyricist(s)/text writer(s)
+  class TOR extends TORY,    # Original release year
+  class TXX extends TXXX,    # User defined text information frame
+
   class COM extends COMM,    # Comments
-  class TCO extends TCON     # Content type
 ]
 for cls in $FRAMES_2_2
   FRAMES_2_2[cls] = cls
