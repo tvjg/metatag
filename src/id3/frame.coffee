@@ -50,13 +50,13 @@ class Frame
     Object.defineProperty(this, 'FrameID', {
       enumerable: true,
       get: () -> @constructor.name
-    });
+    })
 
     Object.defineProperty(this, 'HashKey', {
       configurable: true,
       enumerable: true,
       get: () -> @FrameID
-    });
+    })
 
     return this unless arguments.length > 0
 
@@ -190,7 +190,7 @@ class COMM extends TextFrame
       # My guess is this may be used for writes, so I'm unsure if neccessary
       # here.
       get: () -> sprintf('%s:%s:%s', @FrameID, @desc || 'None', @lang || 'None')
-    });
+    })
 
 ## Content type (Genre)
 
@@ -211,7 +211,7 @@ class TCON extends TextFrame
       Object.defineProperty(this, 'genres', {
         get: @__get_genres,
         set: @__set_genres
-      });
+      })
 
     __get_genres: ->
       genres = []
