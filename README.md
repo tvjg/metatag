@@ -19,12 +19,13 @@ Todo
 ----
 
 * More complete support for all ID3 frames
-* Support advanced ID3 features like frame compression
 * Cleanup TODO comments
 * Investigate higher level parsing methods ie streams of tokens
 * Support for other metadata formats
+* Fallback for unsupported text encodings
 * Clientside support
 * Accept file readstream instead of opening file
+* Support advanced ID3 features like encryption?
 * Write support?
 
 See Also
