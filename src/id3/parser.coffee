@@ -207,8 +207,10 @@ class Parser
           if ((name.replace(/[\x00]+$/g, '')) == '') then return false
 
           size      = bpi(size)
-          framedata = data[10...10+size]
-          data      = data[10+size..]
+          frameEnd  = 10+size
+          frameEnd  = data.length-1 if (frameEnd > data.length)
+          framedata = data[10...frameEnd]
+          data      = data[frameEnd..]
 
           continue if (size == 0) # drop empty frames
 
@@ -243,8 +245,10 @@ class Parser
 
           if ((name.replace(/[\x00]+$/g, '')) == '') then return false
 
-          framedata = data[6...6+size]
-          data      = data[6+size..]
+          frameEnd  = 6+size
+          frameEnd  = data.length-1 if (frameEnd > data.length)
+          framedata = data[6...frameEnd]
+          data      = data[frameEnd..]
 
           continue if (size == 0) # drop empty frames
 
