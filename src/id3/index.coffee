@@ -117,7 +117,9 @@ class ID3
             @size = 0
             throw err if context.fileSize < 128
 
-            do parser.readV1Frames
+            return parser
+              .readV1Frames()
+              .then( (tag) => tag or throw err )
 
           else throw err
 

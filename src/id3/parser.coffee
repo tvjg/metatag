@@ -126,7 +126,7 @@ class Parser
     @read(128).then (buff) =>
       frames = ParseID3v1(buff)
 
-      throw err unless frames?
+      return null unless frames?
 
       @tag.version = { major: 1, minor: 1 }
       @tag.add(frame) for name,frame of frames
