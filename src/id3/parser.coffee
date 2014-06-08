@@ -3,7 +3,7 @@ Q       = require 'q'
 
 unsynch      = require './unsynch'
 convert      = require '../text-encodings'
-BitPaddedInt = require '../BitPaddedInt'
+BitPaddedInt = require '../bit-padded-int'
 {Frame}      = require './frame'
 
 {ValueError, EOFError, NotImplementedError} = require '../errors'

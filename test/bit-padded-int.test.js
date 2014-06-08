@@ -1,7 +1,7 @@
 var vows   = require('vows');
 var should = require('should');
 
-var BitPaddedInt = require('../lib/BitPaddedInt.js');
+var BitPaddedInt = require('../lib/bit-padded-int.js');
 
 vows.describe('BitPaddedInt').addBatch({
   'A BitPaddedInt(0)': {
