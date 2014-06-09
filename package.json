@@ -4,15 +4,15 @@
   "private": true,
   "dependencies": {
     "flatiron": "0.2.5",
-    "sprintf-js": "*",
-    "iconv": "*",
-    "q": "~0.9.6"
+    "sprintf-js": "~0.0.7",
+    "iconv": "~2.1",
+    "q": "~0.9"
   },
   "devDependencies": {
-    "cli-easy": "*",
-    "vows": "*",
-    "should": "*",
-    "rewire": "*"
+    "coffee-script": "~1.7",
+    "vows": "~0.7",
+    "should": "~4.0",
+    "rewire": "~2.0"
   },
   "main": "lib/metatag.js",
   "scripts": {

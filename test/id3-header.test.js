@@ -58,7 +58,7 @@ vows
 	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should throw a not supported error': function (err, id3) {
-	  err.should.match(/not supported/);
+	  err.message.should.match(/not supported/);
 	}
       },
 
@@ -70,7 +70,7 @@ vows
 	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should throw an end of file error': function (err, id3) {
-	  err.should.match(/end of file/i);
+	  err.message.should.match(/end of file/i);
 	}
       },
 
@@ -139,7 +139,7 @@ vows
 	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should throw an end of file error': function (err, id3) {
-	  err.should.match(/end of file/i);
+	  err.message.should.match(/end of file/i);
 	}
       }
 

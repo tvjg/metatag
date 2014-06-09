@@ -20,7 +20,7 @@ vows
 	  new ID3(empty, this.callback)
 	},
 	'should throw a no header error': function (err, id3) {
-	  err.should.match(/too small/);
+	  err.message.should.match(/too small/);
 	}
       },
       'loading a file that doesn\'t exist': {
@@ -28,7 +28,7 @@ vows
 	  new ID3(join('path','does','not','exist'), this.callback)
 	},
 	'should throw ENOENT': function (err, id3) {
-	  err.should.match(/ENOENT/);
+	  err.message.should.match(/ENOENT/);
 	}
       },
       'loading an empty header ': {
@@ -42,7 +42,7 @@ vows
 	  parser.loadHeader().nodeify(this.callback);
 	},
 	'should throw an end of file error': function (err, id3) {
-	  err.should.match(/end of file/i);
+	  err.message.should.match(/end of file/i);
 	}
       },
       'loading silent test data header ': {
