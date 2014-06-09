@@ -16,8 +16,11 @@
   },
   "main": "lib/metatag.js",
   "scripts": {
+    "build": "coffee --bare --compile -o lib/ src/",
     "test": "vows --spec",
-    "start": "node app.js"
+    "start": "node app.js",
+    "prepublish": "npm run-script build",
+    "pretest": "npm run-script build"
   },
   "name": "metatag",
   "author": "John Guidry <lowdowndirtyrottenscoundrel@gmail.com>",
