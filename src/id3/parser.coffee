@@ -194,7 +194,10 @@ class Parser
       bpi = @determineBPI(data, frames)
       reader = () =>
         while data.length > 0
-          header = data[0...10]
+          # Node versions < 0.10 throw out of bounds error when slicing beyond
+          # end of Buffer. If that would happen, default to buffer.length.
+          bound = if data.length < 10 then data.length else 10
+          header = data[0...bound]
           offset = 0
 
           try
@@ -231,7 +234,8 @@ class Parser
     else if (2 <= @tag.version.minor)
       reader = () =>
         while data.length > 0
-          header = data[0...6]
+          bound = if data.length < 6 then data.length else 6
+          header = data[0...bound]
           offset = 0
 
           try
