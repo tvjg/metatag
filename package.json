@@ -1,7 +1,8 @@
 {
+  "name": "metatag",
   "description": "metatag is a Mutagen inspired library for parsing audio metadata formats like ID3.",
-  "version": "0.4.2",
-  "private": true,
+  "keywords": ["id3", "metadata", "audio", "mp3", "mutagen"],
+  "version": "0.4.3",
   "dependencies": {
     "flatiron": "0.2.5",
     "sprintf-js": "~0.0.7",
@@ -22,7 +23,14 @@
     "prepublish": "npm run-script build",
     "pretest": "npm run-script build"
   },
-  "name": "metatag",
+  "bin": "./bin/metatag",
   "author": "John Guidry <lowdowndirtyrottenscoundrel@gmail.com>",
-  "license": "GPL-2.0"
+  "license": "GPL-2.0",
+  "repository" : {
+    "type" : "git",
+    "url" : "http://github.com/dirtyrottenscoundrel/metatag.git"
+  },
+  "bugs": {
+    "url": "http://github.com/dirtyrottenscoundrel/metatag/issues"
+  }
 }
