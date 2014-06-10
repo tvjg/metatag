@@ -24,7 +24,7 @@ _24 = new ID3(); _24.version = { major: 2, minor: 4, sub: 0 }
 
 // TT1 test framedata
 _buff1           = new Buffer('54543100008300','hex');
-_buff2           = new Buffer(Array(16).join('123456789abcdef'));
+_buff2           = new Buffer(Array(17).join('123456789abcdef'));
 buff22DirectInts = Buffer.concat([_buff1, _buff2]);
 
 // Unknown v2.2 framedata
