@@ -3,6 +3,8 @@ metatag
 metatag is a library for parsing audio metadata formats like ID3. It also
 provides a small CLI utility for inspecting audio metadata.
 
+[![build status](https://secure.travis-ci.org/dirtyrottenscoundrel/metatag.png)](http://travis-ci.org/dirtyrottenscoundrel/metatag)
+
 metatag is inspired by the wonderful
 [Mutagen](https://code.google.com/p/mutagen/) library. For the moment,
 development is exclusively focused on reading metadata, not writing or updating
