@@ -1,6 +1,42 @@
 #!/usr/bin/env node
+var parseArgs = require('minimist');
+var path      = require('path');
+var util      = require('util');
+var endOfLine = require('os').EOL;
 
-/**
- * Dispatches the argv to the application.
- */
-require('../app');
+var Metatag = require('../lib/metatag');
+
+var args = process.argv.slice(2)
+  , argv = parseArgs(args, { alias: {'h': 'help'} })
+  , filepath = argv._[0];
+
+if (!filepath || argv.help) {
+  var msg = [
+    'Usage: metatag [file]',
+    'metatag inspects an audio file for metadata and dumps a',
+    'representation to stdout',
+    '',
+    '-h, --help   Prints this message',
+  ].join(endOfLine);
+
+  console.log(msg);
+} else {
+  // Use promises or callbacks!
+  new Metatag(filepath, function (err, tag) {
+    if (err) {
+      console.error(err.stack);
+    } else {
+      console.log(util.inspect(tag, { showHidden:true, depth: 3 }));
+    }
+  });
+
+  //new Metatag()
+    //.load(filepath)
+    //.then(function (tag) {
+      //console.log(util.inspect(tag, { showHidden:true, depth: 3 }));
+    //})
+    //.fail(function (err) {
+      //console.error(err.stack);
+    //})
+    //.done();
+}

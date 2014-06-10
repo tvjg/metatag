@@ -42,7 +42,7 @@ Todo
 * Support advanced ID3 features like encryption?
 * Write support?
 * Make various tag formats into git submodules under the main metatag interface
-* Ditch flatiron (in favor of lighter cli option) and sprintf requirements
+* Ditch sprintf requirements
 
 See Also
 --------
